@@ -9,6 +9,7 @@ on:
       - 'scripts/dj-catalog.mjs'
       - 'scripts/venue-catalog.mjs'
       - 'data/menu.json'
+      - 'data/calendar.json'
       - 'package*.json'
       - '.github/workflows/pages.yml'
   workflow_run:

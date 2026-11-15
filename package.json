@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "sync": "node scripts/sync-menu.mjs",
+    "sync": "node scripts/sync-all-menus.mjs",
     "test": "node --test",
     "build": "esbuild src/index.js --bundle --format=esm --outfile=dist/_worker.js",
-    "build:site": "node scripts/build-site.mjs"
+    "build:site": "node scripts/build-site.mjs",
+    "sync:calendar": "node scripts/sync-calendar.mjs"
   },
   "dependencies": {
     "cheerio": "^1.1.2"

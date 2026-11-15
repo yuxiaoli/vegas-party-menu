@@ -2,10 +2,10 @@ import { load } from 'cheerio';
 
 export const SOURCE_URL = 'https://halfsaintvegas.com/pages/this-weeks-party-menu';
 
-export function parseMenu(html, fetchedAt) {
+export function parseMenu(html, fetchedAt, { sourceUrl = SOURCE_URL, allowDatedPage = false } = {}) {
   const $ = load(html);
   const root = $('.PageContent.Rte').first();
-  if (!root.length || !/THIS WEEK'S PARTY MENU/i.test($('h1').text())) throw new Error('Expected menu page was not found');
+  if (!root.length || !(/THIS WEEK'S PARTY MENU/i.test($('h1').text()) || (allowDatedPage && /^WE \d{1,2}-\d{1,2}-\d{2,4} PARTY MENU/i.test($('h1').text().trim())))) throw new Error('Expected menu page was not found');
   const sections = [{ title: 'Introduction', blocks: [] }];
   let current = sections[0];
   let line = '';
@@ -45,9 +45,9 @@ export function parseMenu(html, fetchedAt) {
   }
   if (!['Dayclubs', 'Nightclubs'].every(name => events.some(e => e.section.toLowerCase() === name.toLowerCase() && e.venue))) throw new Error('Menu is incomplete or contains no recognizable events in a main category');
   const selfLink = root.find('a').toArray().find(a => {
-    try { return new URL($(a).attr('href'), SOURCE_URL).href.replace(/\/$/, '') === SOURCE_URL; } catch { return false; }
+    try { return new URL($(a).attr('href'), sourceUrl).href.replace(/\/$/, '') === sourceUrl; } catch { return false; }
   });
-  const week = selfLink && $(selfLink).text().match(/Week Ending\s+(\d{1,2})-(\d{1,2})-(\d{2,4})/i);
+  const week = (allowDatedPage && $('h1').text().match(/^WE\s+(\d{1,2})-(\d{1,2})-(\d{2,4})/i)) || (selfLink && $(selfLink).text().match(/Week Ending\s+(\d{1,2})-(\d{1,2})-(\d{2,4})/i));
   let weekEnding = null;
   if (week) {
     const year = week[3].length === 2 ? 2000 + Number(week[3]) : Number(week[3]);
@@ -55,6 +55,6 @@ export function parseMenu(html, fetchedAt) {
     const date = new Date(Date.UTC(year, month - 1, day));
     if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) weekEnding = date.toISOString().slice(0, 10);
   }
-  const links = root.find('a[href]').toArray().map(a => ({ text: $(a).text().replace(/\s+/g, ' ').trim(), url: new URL($(a).attr('href'), SOURCE_URL).href })).filter(a => a.text);
-  return { sourceUrl: SOURCE_URL, fetchedAt, weekEnding, sections, events, links };
+  const links = root.find('a[href]').toArray().map(a => ({ text: $(a).text().replace(/\s+/g, ' ').trim(), url: new URL($(a).attr('href'), sourceUrl).href })).filter(a => a.text);
+  return { sourceUrl, fetchedAt, weekEnding, sections, events, links };
 }
