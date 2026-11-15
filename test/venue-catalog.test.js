@@ -66,7 +66,7 @@ test('verified venue links preserve visible labels and cannot link unreviewed or
  const dj={profiles:[{id:'alesso',name:'Alesso',detailUrl:CATALOG_URL+'djs/alesso.html',sourceUrl:'https://djmag.com/top100djs/2026/56/alesso',year:2026,rank:56,origin:'Sweden',bestKnownFor:'Verified work'}]};
  const $=load(renderSite(menu,{source:'github'},new Date(),dj,catalog));
  assert.equal($('.venue-link').length,35);assert.equal($('.dj-profile').length,1);
- assert.equal($('.dj-name').attr('href'),CATALOG_URL+'djs/alesso.html');
+ assert.equal($('.dj-details').attr('href'),CATALOG_URL+'djs/alesso.html');
  $('.event-card').each((i,el)=>{const a=reviewedVenue(menu.events[i].venue);const link=$(el).find('.venue a');assert.equal(link.length,a?1:0);if(a){assert.equal(link.attr('href'),CATALOG_URL+`venues/${a.id}.html`);assert.equal(link.text(),menu.events[i].venue);assert.equal(link.attr('rel'),'noopener noreferrer');}});
  const value=VENUE_ALIASES[0].menuVenue, p=catalog.venues[0];
  assert.equal(renderVenueName(value,{venues:[{...p,detailUrl:'javascript:alert(1)'}]}),value);
