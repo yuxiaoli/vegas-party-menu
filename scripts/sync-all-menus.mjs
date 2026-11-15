@@ -16,10 +16,9 @@ export async function syncAllMenus({ menuPath = 'data/menu.json', calendarPath =
   const restoreStage = `${calendarTarget}.${id}.restore`;
   let keepRecovery = false, previousCalendar;
   try {
-    const calendar = await syncCalendar({ path: calendarStage, fetchImpl, now });
-    const currents = calendar.menus.filter(menu => menu.isCurrent);
-    if (currents.length !== 1) throw new Error('Expected exactly one current menu');
-    const current = currents[0];
+    let current;
+    const calendar = await syncCalendar({ path: calendarStage, fetchImpl, now, onCurrentMenu: menu => { current = menu; } });
+    if (!current) throw new Error('Expected exactly one verified current menu');
     if (!current.events.length || !current.sections.length || !Number.isFinite(Date.parse(current.fetchedAt))) throw new Error('Current menu is incomplete');
     const menu = Object.fromEntries(LEGACY_FIELDS.map(field => [field, current[field]]));
     if (LEGACY_FIELDS.some(field => menu[field] === undefined)) throw new Error('Missing legacy menu field');

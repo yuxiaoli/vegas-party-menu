@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildCalendar, discoverMenus, resolveEventDate, syncCalendar, INDEX_URL } from '../scripts/menu-calendar.mjs';
+import { buildCalendar, discoverMenus, resolveEventDate, syncCalendar, retainCalendar, INDEX_URL } from '../scripts/menu-calendar.mjs';
 import { SOURCE_URL } from '../scripts/menu-source.mjs';
 const future = 'https://halfsaintvegas.com/pages/we-01-02-27-party-menu-nye';
 const links = `<a href="${SOURCE_URL}">Week Ending 11-15-26</a><a href="${future}">Week Ending 01-02-27 (NYE)</a>`;
@@ -69,4 +69,24 @@ test('future fetching concurrency never exceeds three and partial categories fai
  await assert.rejects(syncCalendar({path:join(dir,'calendar.json'),now,fetchImpl:async url=>new Response(url===future?'<h1>WE 01-02-27 PARTY MENU</h1><div class="PageContent Rte"><h2>Dayclubs</h2><p>VENUE<br>Friday – Party</p><h2>Nightclubs</h2></div>':docs.get(url))}),/incomplete/);
  assert.equal(await readFile(join(dir,'calendar.json'),'utf8'),'previous');
  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+
+test('retention uses LA Monday boundary, DST, year rollover and actual spillover dates',()=>{
+ const old={...menu('https://halfsaintvegas.com/pages/we-11-08-26-party-menu','2026-11-08',[{...event,dateText:'Sunday, 11/8'}]),sections:[{title:'Nightclubs',blocks:['OMNIA','Sunday, 11/8 – Alesso']}]};
+ const recent={...menu(SOURCE_URL,'2026-11-15',[event,{...event,dateText:'Monday - Sunday'}]),sections:[{title:'Nightclubs',blocks:['OMNIA','Saturday, 11/14 – Alesso','Monday - Sunday – Alesso']}]};
+ const futureMenu={...menu(future,'2026-11-22',[{...event,dateText:'Saturday, 11/21'}]),sections:[{title:'Nightclubs',blocks:['Saturday, 11/21 – Alesso']}]};
+ const raw=buildCalendar([old,recent,futureMenu],now);
+ assert.equal(retainCalendar(raw,new Date('2026-11-16T07:59:59Z')).events.length,3);
+ const monday=retainCalendar(raw,new Date('2026-11-16T08:00:00Z'));
+ assert.equal(monday.events.length,1);assert.equal(monday.menus.length,1);assert.equal(monday.retention.weekStart,'2026-11-16');assert.ok(!JSON.stringify(monday.menus).includes('11/14'));
+ const spill={...menu(future,'2027-01-02',[{...event,dateText:'Sunday, 1/3'},{...event,dateText:'Thursday, 12/24'},{...event,dateText:'Thursday - Sunday'}]),sections:[{title:'Nightclubs',blocks:['Sunday, 1/3 – Alesso','Thursday, 12/24 – Alesso','Thursday - Sunday – Alesso']}]};
+ const x=retainCalendar(buildCalendar([spill],now),new Date('2027-01-03T22:00:00Z'));assert.equal(x.events.length,2);assert.equal(x.events[0].eventDate,'2027-01-03');assert.equal(x.events[0].dateWarnings.length,1);assert.ok(!JSON.stringify(x.menus).includes('12/24'));assert.equal(x.retention.weekStart,'2026-12-28');
+ for(const [instant,start] of [['2026-03-09T06:59:00Z','2026-03-02'],['2026-03-09T07:00:00Z','2026-03-09'],['2026-11-02T07:59:00Z','2026-10-26'],['2026-11-02T08:00:00Z','2026-11-02']])assert.equal(retainCalendar(raw,new Date(instant)).retention.weekStart,start);
+});
+
+test('stale current source or empty index never replaces the saved calendar',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'calendar-'));const path=join(dir,'calendar.json');
+ try{for(const mode of ['stale','empty']){await writeFile(path,'previous');await assert.rejects(syncCalendar({path,now:mode==='stale'?'2026-11-16T08:00:00Z':now,fetchImpl:async url=>new Response(mode==='empty'&&url===INDEX_URL?'<h1>UPCOMING EVENTS</h1><div class="PageContent Rte"></div>':docs.get(url))}),mode==='stale'?/stale/:/empty or incomplete/);assert.equal(await readFile(path,'utf8'),'previous');}}
+ finally{await rm(dir,{recursive:true,force:true});}
 });

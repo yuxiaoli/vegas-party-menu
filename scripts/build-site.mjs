@@ -1,3 +1,4 @@
+import { isRetainedEvent } from '../src/calendar-filters.js';
 import { readFile, writeFile, mkdir, rm, copyFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { renderSite } from '../src/site.js';
@@ -10,12 +11,13 @@ if (menu.weekEnding != null && !/^\d{4}-\d{2}-\d{2}$/.test(menu.weekEnding)) thr
 let calendar = null;
 try { calendar = JSON.parse(await readFile('data/calendar.json', 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 if (calendar && (calendar.schemaVersion !== 1 || calendar.timeZone !== 'America/Los_Angeles' || !calendar.events?.length || !calendar.menus?.length || !Number.isFinite(Date.parse(calendar.fetchedAt)))) throw new Error('Invalid multiweek calendar snapshot');
-const siteMenu = calendar ? {...menu, events:calendar.events} : menu;
+const buildTime = new Date();
+const siteMenu = calendar ? {...menu, events:calendar.events.filter(event=>isRetainedEvent(event,buildTime))} : menu;
 await rm('site-dist', { recursive: true, force: true });
 await mkdir('site-dist/data', { recursive: true });
 await mkdir('site-dist/assets', { recursive: true });
 const [djCatalog, venueCatalog] = await Promise.all([loadDJCatalog(siteMenu), loadVenueCatalog(siteMenu)]);
-let html = renderSite(siteMenu, { source: 'github_pages_snapshot', remoteRead: 'ok' }, new Date(), djCatalog, venueCatalog, calendar);
+let html = renderSite(siteMenu, { source: 'github_pages_snapshot', remoteRead: 'ok' }, buildTime, djCatalog, venueCatalog, calendar);
 await writeFile('site-dist/data/dj-matches.json', JSON.stringify(djCatalog, null, 2) + '\n');
 await writeFile('site-dist/data/venue-matches.json', JSON.stringify(venueCatalog, null, 2) + '\n');
 html = html.replace('aria-label="Menu freshness"', `aria-label="Menu freshness" data-week-ending="${menu.weekEnding || ''}"`);
