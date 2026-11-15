@@ -50,6 +50,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site-dist
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+      # The artifact index can lag immediately after upload. Unique attempt names
+      # also prevent a rerun from selecting artifacts left by an earlier attempt.
+      - name: Allow artifact index to settle
+        run: sleep 15
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
