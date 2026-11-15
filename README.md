@@ -28,4 +28,14 @@ Party-type and weekday buttons, search, reset and shareable URL filters make the
 
 `Deploy menu website` publishes after a relevant main-branch push or successful `Weekly menu sync`, and supports manual deployment without another crawl. The existing Monday 18:17 UTC cron is unchanged; there is no additional schedule. The workflow_run trigger handles successful snapshot commits made by GITHUB_TOKEN. Failed collection retains the last successful snapshot and published menu.
 
-GitHub Pages uses Actions at https://yuxiaoli.github.io/half-saints-party-menu/ . The build uses relative asset/data/feed paths. Verify with `npm ci && npm test && npm run build:site` and desktop/mobile browser checks.
+GitHub Pages uses Actions at https://yuxiaoli.github.io/vegas-party-menu/ . The build uses relative asset/data/feed paths. Verify with `npm ci && npm test && npm run build:site` and desktop/mobile browser checks.
+
+## DJ catalog integration
+
+The static website enriches exact artist matches using the existing [DJ catalog](https://yuxiaoli.github.io/djmag-data/). Every Pages build reads its public index, then only the matching artists' JSON and detail pages. No additional crawler, schedule, chart or API change is introduced. `site-dist/data/dj-matches.json` records the catalog edition, read time, coverage and verified profile fields.
+
+Matching is case/spacing-insensitive and removes only a trailing explicit arrival-time note such as `(9pm arrival!)`. It does not fuzzy-match, strip DJ prefixes, guess aliases, split collaborations or identify generic party descriptions. Ambiguous names remain unmatched. Unmatched does not mean unranked. Ranking years come from the catalog's annual edition and are checked against the artist record, not inferred from collection time. Bio details appear only with field-level provenance; unknowns stay unknown. Origin is labelled "From", not treated as nationality.
+
+The menu remains complete if the optional catalog is unavailable, with a visible notice. A failed or mismatched artist record is omitted rather than showing stale or invented details. Existing source JSON, API/RSS and Monday 18:17 UTC collection remain unchanged.
+
+Repository and GitHub Pages name: `vegas-party-menu`. Previous GitHub repository URLs redirect, but GitHub does not guarantee redirects for the former Pages site path. Legacy Cloudflare API/RSS URLs and collector configuration are unchanged.
