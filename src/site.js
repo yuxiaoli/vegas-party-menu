@@ -33,7 +33,6 @@ export function renderSite(menu, snapshot, now = new Date(), djCatalog = null) {
       <p class="venue">${escape(event.venue || 'Venue not specified')}</p>
       ${renderDJProfile(event.description, djCatalog)}
       <div class="entry"><span class="entry-label">THE DETAILS</span><p>${escape(event.details || 'No entry details provided. Check the original menu.')}</p></div>
-      <a class="source-link" href="${escape(menu.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Check source details for ${escape(event.description || event.venue)}">Check original menu <span aria-hidden="true">↗</span></a>
     </article>`;
   }).join('');
   const extraSections = menu.sections.filter(section => !['Introduction', 'Dayclubs', 'Nightclubs', 'After Parties'].includes(section.title));
