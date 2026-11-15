@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {load} from 'cheerio';
-import {artistKey, matchArtist, renderDJProfile, renderArtistHeading, renderArrivalNote, renderKnownFor, CATALOG_URL} from '../src/dj-catalog.js';
+import {artistKey, matchArtist, renderDJProfile, renderArtistHeading, renderKnownFor, CATALOG_URL} from '../src/dj-catalog.js';
 import {parseCatalogIndex, verifyProfile, loadDJCatalog} from '../scripts/dj-catalog.mjs';
 import {renderSite} from '../src/site.js';
 import menu from '../data/menu.json' with {type:'json'};
@@ -53,7 +53,7 @@ test('rendering preserves source menu and omits missing biography fields and lab
  const html=renderSite(menu,{source:'github'},new Date('2026-11-15T12:00:00Z'),catalog);
  assert.equal((html.match(/<article class="event-card"/g)||[]).length,41);assert.equal((html.match(/class="dj-profile"/g)||[]).length,1);
  assert.match(html,/DJ MAG 2026/);assert.match(html,/#18/);assert.ok(!html.includes('<dt>From</dt>'));assert.ok(!html.includes('<dt>Best known for</dt>'));assert.ok(!html.includes('>null<'));assert.ok(!html.includes('Catalog record updated'));assert.ok(html.includes('View DJ profile '));assert.ok(!html.includes('No DJ'));
- assert.equal(load(html)('.artist-link').text(),'Steve Aoki');assert.ok(html.includes('class="arrival-note">(9pm arrival!)'));assert.ok(html.includes(entry.detailUrl));assert.ok(!html.includes('<canvas'));
+ assert.equal(load(html)('.artist-link').text(),'Steve Aoki');assert.equal(load(html)('.arrival-note').length,0);assert.equal(load(html)('.artist-link').parent().text(),'Steve Aoki (9pm arrival!)');assert.ok(html.includes(entry.detailUrl));assert.ok(!html.includes('<canvas'));
  const bad={...dj,description:'<img src=x onerror=alert(1)>'};assert.ok(!renderDJProfile('Steve Aoki',{profiles:[bad]}).includes('<img'));
 });
 
@@ -77,11 +77,12 @@ test('matched heading links artist only; purple panel has rank, bold origin, kno
  const html=renderSite(menu,{source:'github'},new Date('2026-11-15T12:00:00Z'),catalog);
  const $=load(html), cards=$('.event-card');
  assert.equal(cards.length,menu.events.length);assert.equal(cards.find('h3 a').length,1);
- cards.each((i,card)=>assert.equal($(card).find('h3').text(),matchArtist(menu.events[i].description,[dj])?.name || menu.events[i].description));
+ cards.each((i,card)=>assert.equal($(card).find('h3').text(),menu.events[i].description));
  const panel=cards.filter((_,e)=>$(e).find('h3').text().startsWith('Steve Aoki')).find('.dj-profile');
  assert.deepEqual(panel.children().map((_,e)=>$(e).attr('class')).get(),['dj-rank','dj-from','dj-known','dj-details']);
- assert.equal(panel.find('.dj-name').length,0);assert.equal(panel.find('.dj-details').attr('href'),entry.detailUrl);assert.equal(panel.find('.dj-details').text().trim(),'View DJ profile');
- assert.equal(cards.find('h3 a').attr('href'),entry.detailUrl);assert.equal(cards.find('h3 a').text(),'Steve Aoki');assert.equal(cards.find('.arrival-note').text(),'(9pm arrival!)');
+ assert.equal(panel.find('.dj-name').length,0);assert.equal(panel.find('.dj-details').attr('href'),entry.detailUrl);assert.equal(panel.find('.dj-details').text().trim(),'View DJ profile ↗');
+ assert.equal(cards.find('h3 a').attr('href'),entry.detailUrl);assert.equal(cards.find('h3 a').text(),'Steve Aoki');assert.equal(cards.find('.arrival-note').length,0);assert.equal(cards.find('h3 a').parent().text(),'Steve Aoki (9pm arrival!)');
+ cards.each((i,card)=>assert.equal($(card).find('.entry p').text(),menu.events[i].details));
  assert.equal(panel.find('.dj-from').text(),'From Example place');assert.equal(panel.find('.dj-from strong').text(),'Example place');assert.equal(panel.find('.dj-known').text(),'Verified work');
  assert.ok(!panel.text().includes('Best known for'));assert.ok(!panel.text().includes('Do not render'));assert.ok(!panel.text().includes('Catalog record updated'));assert.ok(panel.text().includes('View DJ profile '));
  for(const description of ['R&B Party','HipHop/Top40','Kaskade']) assert.equal(renderDJProfile(description,catalog),'');
@@ -97,25 +98,24 @@ test('only reviewed meaningful fragments are emphasized, preserving exact source
  for(const dj of [{id:'other',bestKnownFor:text},{id:'alesso',bestKnownFor:text+' Updated.'},{id:'alesso',bestKnownFor:'<script>bad</script>'}]){const html=renderKnownFor(dj);assert.ok(!html.includes('<strong>'));assert.ok(!html.includes('<script>'));}
 });
 
-test('arrival notes survive outside linked headings, but unmatched and ambiguous titles stay untouched',()=>{
+test('arrival suffix stays plain in the heading; unmatched and ambiguous titles stay untouched',()=>{
  const catalog={profiles:[verifyProfile(profile,entry,detail)]};
- assert.equal(load('<h3>'+renderArtistHeading('Steve Aoki (9pm arrival!)',catalog)+'</h3>')('h3').text(),'Steve Aoki');
- assert.equal(load(renderArrivalNote('Steve Aoki (9pm arrival!)',catalog))('p').text(),'(9pm arrival!)');
- for(const title of ['Kaskade (9pm arrival!)','R&B Party','Steve Aoki (tribute)','Steve Aoki & Alesso']){assert.equal(load('<h3>'+renderArtistHeading(title,catalog)+'</h3>')('h3').text(),title);assert.equal(renderArrivalNote(title,catalog),'');}
+ for(const title of ['Steve Aoki (9pm arrival!)','Steve Aoki (10:30pm arrival!)','Steve Aoki']) {
+  const $=load('<h3>'+renderArtistHeading(title,catalog)+'</h3>');
+  assert.equal($('h3').text(),title);assert.equal($('h3 a').text(),'Steve Aoki');assert.equal($('h3 a').attr('href'),entry.detailUrl);
+  assert.ok(!$('h3 a').text().includes('arrival'));
+  if(title.includes('arrival'))assert.equal($('h3').contents().last()[0].type,'text');
+ }
+ for(const title of ['Kaskade (9pm arrival!)','R&B Party','Steve Aoki (tribute)','Steve Aoki & Alesso']){const $=load('<h3>'+renderArtistHeading(title,catalog)+'</h3>');assert.equal($('h3').text(),title);assert.equal($('a').length,0);}
  const ambiguous={profiles:[catalog.profiles[0],{...catalog.profiles[0],id:'other'}]};
  assert.equal(renderArtistHeading('Steve Aoki (9pm arrival!)',ambiguous),'Steve Aoki (9pm arrival!)');
- assert.equal(renderArrivalNote('Steve Aoki (9pm arrival!)',ambiguous),'');
 });
 
-
-test('profile link ends the panel with an accessible thin monochrome SVG, never a Unicode arrow',()=>{
+test('profile link ends the panel with the original arrow character and no SVG',()=>{
  const dj={...verifyProfile(profile,entry,detail),origin:'Sweden',bestKnownFor:'Verified work'};
  const $=load(renderDJProfile('Steve Aoki',{profiles:[dj]}));
- const link=$('.dj-details'),icon=link.find('svg');
+ const link=$('.dj-details');
  assert.equal($('.dj-profile').children().last().attr('class'),'dj-details');
- assert.equal(link.text().trim(),'View DJ profile');assert.equal(link.attr('href'),entry.detailUrl);
- assert.equal(icon.length,1);assert.equal(icon.attr('fill'),'none');assert.equal(icon.attr('stroke'),'currentColor');assert.equal(icon.attr('stroke-width'),'1.5');
- assert.equal(icon.attr('aria-hidden'),'true');assert.equal(icon.attr('focusable'),'false');assert.equal(icon.attr('viewBox'),'0 0 24 24');
- assert.equal(icon.find('path').attr('d'),'M7 17 17 7M7 7h10v10');
- assert.ok(!link.text().includes('↗'));assert.equal(icon.find('text,title,image').length,0);
+ assert.equal(link.text().trim(),'View DJ profile ↗');assert.equal(link.attr('href'),entry.detailUrl);
+ assert.equal(link.find('svg').length,0);assert.equal(link.attr('rel'),'noopener noreferrer');
 });
