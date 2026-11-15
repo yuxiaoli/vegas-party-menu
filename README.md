@@ -24,7 +24,7 @@ The public page is branded **Vegas Parties**, including its title, sharing metad
 
 `npm run build:site` generates `site-dist/`: a responsive, source-backed menu, local JSON snapshot and RSS. The website contains no charts or chart-library dependencies and requires no Cloudflare resources, secrets or external CDN. The existing API/RSS service code and source collector are preserved.
 
-Party-type and weekday buttons, search, reset and shareable URL filters make the original listings easy to browse. Each card retains the original artist, venue, date wording, entry conditions and source link. Recurring entries are explicitly marked without assigning invented dates. The browser recalculates freshness using the current Las Vegas date. With JavaScript disabled, all published menu cards remain readable.
+Party-type and weekday buttons, search, reset and shareable URL filters make the original listings easy to browse. Each card retains the original artist, venue, date wording and entry conditions; the original menu remains linked in the page navigation and fine print. Recurring entries are explicitly marked without assigning invented dates. The browser recalculates freshness using the current Las Vegas date. With JavaScript disabled, all published menu cards remain readable.
 
 `Deploy menu website` publishes after a relevant main-branch push or successful `Weekly menu sync`, and supports manual deployment without another crawl. The existing Monday 18:17 UTC cron is unchanged; there is no additional schedule. The workflow_run trigger handles successful snapshot commits made by GITHUB_TOKEN. Failed collection retains the last successful snapshot and published menu.
 
@@ -41,3 +41,9 @@ The menu remains complete if the optional catalog is unavailable; unmatched entr
 Repository and GitHub Pages name: `vegas-party-menu`. Previous GitHub repository URLs redirect, but GitHub does not guarantee redirects for the former Pages site path. Legacy Cloudflare API/RSS URLs and collector configuration are unchanged.
 
 The unfiltered home URL shows every original event, matched or unmatched. Shared URLs with `q`, `day` or `type` parameters intentionally apply the existing search filters; use the root site URL when sharing the complete menu.
+
+## Venue detail links
+
+The existing venue name becomes a link only after a reviewed full-label alias matches the [published venue catalog](https://yuxiaoli.github.io/djmag-data/venues/index.html). The 11 aliases in `src/venue-catalog.js` record the expected catalog ID, canonical name, dayclub/nightclub type, hotel and original source URL. Every Pages build verifies the index, selected JSON records, source provenance and detail-page heading before emitting a link. `site-dist/data/venue-matches.json` records verification time and coverage.
+
+Dayclub/nightclub identities are kept separate, including Marquee. Drais Afterhours, La Jolla and Sapphire are currently unmatched and remain plain text. There is no fuzzy matching, hotel stripping or invented identity. A catalog outage or mismatched record simply omits optional links while retaining every menu card, its original wording and all DJ panels. Venue directory hours, policies and factual summaries never overwrite event-specific menu conditions. Reads use the published catalog only, with bounded concurrency and retries; there is no extra crawler or schedule. Existing source JSON, API/RSS and Monday 18:17 UTC collection remain unchanged.

@@ -1,4 +1,5 @@
 import { renderDJProfile } from './dj-catalog.js';
+import { renderVenueName } from './venue-catalog.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -12,7 +13,7 @@ export function eventDays(dateText) {
   return Array.from({ length: (end - start + 7) % 7 + 1 }, (_, index) => DAYS[(start + index) % 7]);
 }
 
-export function renderSite(menu, snapshot, now = new Date(), djCatalog = null) {
+export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, venueCatalog = null) {
   const weekDate = menu.weekEnding && new Date(`${menu.weekEnding}T12:00:00Z`);
   const knownWeek = weekDate && Number.isFinite(weekDate.getTime());
   const weekLabel = knownWeek ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(weekDate) : 'Not specified by source';
@@ -30,7 +31,7 @@ export function renderSite(menu, snapshot, now = new Date(), djCatalog = null) {
       <div class="card-top"><span class="kind kind-${kind}">${escape(event.section)}</span><span class="event-number">${String(index + 1).padStart(2, '0')}</span></div>
       <p class="event-date">${escape(event.dateText || 'Date not specified')}${weekly ? '<span class="recurring">Recurring · dates not specified</span>' : ''}</p>
       <h3>${escape(event.description || 'See source menu')}</h3>
-      <p class="venue">${escape(event.venue || 'Venue not specified')}</p>
+      <p class="venue">${renderVenueName(event.venue, venueCatalog)}</p>
       ${renderDJProfile(event.description, djCatalog)}
       <div class="entry"><span class="entry-label">THE DETAILS</span><p>${escape(event.details || 'No entry details provided. Check the original menu.')}</p></div>
     </article>`;
@@ -80,6 +81,7 @@ const STYLES = `
 @media(max-width:700px){.category-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}.category-tabs button{text-align:left;padding:12px 14px}}
 .personal-credit{margin:0;padding:18px 5%;text-align:center;background:var(--ink);color:var(--paper);font-size:12px;line-height:1.6}.personal-credit a{text-underline-offset:4px}.dj-profile{margin:0 0 20px;background:#eeeaf7;padding:14px;border:1px solid #d8d1e5;text-align:left}.dj-name{display:block;font-size:16px;font-weight:700;line-height:1.5;margin-bottom:8px;text-underline-offset:4px;overflow-wrap:anywhere}.dj-rank{font-size:10px;text-decoration:none;display:flex;width:fit-content;gap:9px;align-items:center;white-space:nowrap}.dj-rank strong{font-size:20px;letter-spacing:-.5px}.dj-from,.dj-known{font-size:12px;line-height:1.65;margin:10px 0 0;text-align:left;overflow-wrap:anywhere}@media(max-width:700px){.dj-profile{padding:16px}.dj-name{font-size:18px}.dj-rank{font-size:11px}}
 
+.venue-link{text-decoration-line:underline;text-decoration-style:dotted;text-underline-offset:4px;overflow-wrap:anywhere}.venue-link:hover{text-decoration-style:solid}.venue-link:focus-visible{outline:2px solid currentColor;outline-offset:4px}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.event-card{transition:none}.event-card:hover{transform:none}}
 `;
 

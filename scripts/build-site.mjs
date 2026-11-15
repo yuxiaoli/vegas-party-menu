@@ -3,15 +3,17 @@ import { build } from 'esbuild';
 import { renderSite } from '../src/site.js';
 import { handleRequest } from '../src/api.js';
 import { loadDJCatalog } from './dj-catalog.mjs';
+import { loadVenueCatalog } from './venue-catalog.mjs';
 const menu = JSON.parse(await readFile('data/menu.json', 'utf8'));
 if (!menu.events?.length || !Number.isFinite(Date.parse(menu.fetchedAt))) throw new Error('Refusing to publish an invalid or empty snapshot');
 if (menu.weekEnding != null && !/^\d{4}-\d{2}-\d{2}$/.test(menu.weekEnding)) throw new Error('Invalid source week');
 await rm('site-dist', { recursive: true, force: true });
 await mkdir('site-dist/data', { recursive: true });
 await mkdir('site-dist/assets', { recursive: true });
-const djCatalog = await loadDJCatalog(menu);
-let html = renderSite(menu, { source: 'github_pages_snapshot', remoteRead: 'ok' }, new Date(), djCatalog);
+const [djCatalog, venueCatalog] = await Promise.all([loadDJCatalog(menu), loadVenueCatalog(menu)]);
+let html = renderSite(menu, { source: 'github_pages_snapshot', remoteRead: 'ok' }, new Date(), djCatalog, venueCatalog);
 await writeFile('site-dist/data/dj-matches.json', JSON.stringify(djCatalog, null, 2) + '\n');
+await writeFile('site-dist/data/venue-matches.json', JSON.stringify(venueCatalog, null, 2) + '\n');
 html = html.replace('aria-label="Menu freshness"', `aria-label="Menu freshness" data-week-ending="${menu.weekEnding || ''}"`);
 html = html.replace('href="/"', 'href="./"').replaceAll('href="/rss.xml"', 'href="./rss.xml"').replace('href="/api/menu">JSON API', 'href="./data/menu.json">JSON snapshot');
 html = html.replace(/<a href="\/openapi\.json">API docs[^<]*<\/a>/, '');
@@ -26,3 +28,4 @@ await build({ entryPoints: ['src/menu-client.js'], bundle: true, minify: true, f
 console.log(`Built menu-only GitHub Pages site: ${menu.events.length} listings, ${new Set(menu.events.map(event => event.venue)).size} venues. Snapshot ${menu.fetchedAt}.`);
 
 console.log(`DJ catalog: ${djCatalog.status}; ${djCatalog.matchedListingCount} matched listings; edition ${djCatalog.year ?? 'unavailable'}.`);
+console.log(`Venue catalog: ${venueCatalog.status}; ${venueCatalog.venues.length} verified venues; ${venueCatalog.matchedListingCount} matched listings.`);
