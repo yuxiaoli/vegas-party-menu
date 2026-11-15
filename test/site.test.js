@@ -63,7 +63,8 @@ test('Vegas Parties branding replaces the source name throughout the page', () =
   assert.match($('.wordmark').text(), /VEGAS PARTIES/);
   assert.match($('.footer-brand').text(), /VEGAS PARTIES/);
   assert.equal($('#hero-title').text(), 'Your week.In Vegas.');
-  assert.doesNotMatch($('body').text(), /saint/i);
+  assert.doesNotMatch($('.wordmark, .hero, .event-card, footer').text(), /saint/i);
+  assert.match($('#dress-code').text(), /Half Saint/); // Required source attribution, not site branding.
   for (const element of $('meta[content], [aria-label], [title]').toArray()) {
     for (const attribute of ['content', 'aria-label', 'title']) {
       assert.doesNotMatch($(element).attr(attribute) || '', /saint/i);
@@ -75,4 +76,27 @@ test('Vegas Parties branding replaces the source name throughout the page', () =
   assert.equal($('.source-link').length, 0);
   assert.doesNotMatch($('.event-card').text(), /Check original menu/);
   assert.equal($('.event-card').length, menu.events.length);
+});
+
+
+test('personal credit is integrated into the light footer with its exact author link', () => {
+  const html = renderSite(menu, current, now), $ = load(html), credit = $('footer > .personal-credit');
+  assert.equal(credit.length, 1);assert.equal(credit.text(), 'Built by Sean with ❤️');
+  assert.equal(credit.find('a').length, 1);assert.equal(credit.find('a').text(), 'Sean');
+  assert.equal(credit.find('a').attr('href'), 'https://www.linkedin.com/in/yuxiaoli/');
+  const rule = html.match(/\.personal-credit\{([^}]+)\}/)[1];
+  assert.match(rule, /border-top:1px solid var\(--line\)/);assert.match(rule, /color:var\(--muted\)/);
+  assert.doesNotMatch(rule, /background:var\(--ink\)/);assert.match(rule, /text-align:left/);
+});
+
+test('dress code is an attributed concise guide, not invented venue rules or modified menu data', () => {
+  const html = renderSite(menu, current, now), $ = load(html), section = $('#dress-code');
+  assert.equal(section.length, 1);assert.equal(section.find('h3').length, 3);
+  assert.equal(section.closest('.source-notes').length, 1);assert.equal(section[0].name, 'details');assert.notEqual(section.attr('open'), undefined);
+  assert.equal(section.find('.dress-source').attr('href'), 'https://halfsaintvegas.com/pages/vegas-dress-code');
+  assert.match(section.text(), /Half Saint/);assert.match(section.text(), /venue-specific requirements/);
+  assert.match(section.text(), /essential medication/);assert.match(section.text(), /Source checked November 15, 2026/);
+  assert.ok(section.text().split(/\s+/).length <= 200);
+  assert.equal($('.event-card').length, menu.events.length);
+  $('.event-card').each((i, card) => assert.equal($(card).find('.entry p').text(), menu.events[i].details));
 });
