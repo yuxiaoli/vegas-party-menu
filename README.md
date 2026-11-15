@@ -40,7 +40,7 @@ The menu remains complete if the optional catalog is unavailable; unmatched entr
 
 Repository and GitHub Pages name: `vegas-party-menu`. Previous GitHub repository URLs redirect, but GitHub does not guarantee redirects for the former Pages site path. Legacy Cloudflare API/RSS URLs and collector configuration are unchanged.
 
-The unfiltered home URL shows every original event, matched or unmatched. Shared URLs with `q`, `day` or `type` parameters intentionally apply the existing search filters; use the root site URL when sharing the complete menu.
+The root home URL defaults to This week. All dates shows every retained current/future-week event, matched or unmatched. Shared URLs with `q`, `day` or `type` parameters intentionally apply the existing search filters; use the root site URL when sharing the complete menu.
 
 ## Venue detail links
 
@@ -56,6 +56,8 @@ The existing “The rest of the menu” area includes a concise, attributed summ
 
 The website also publishes `data/calendar.json`: the current menu plus every week actually linked by the current menu and Upcoming Events index. The existing Monday 18:17 UTC sync collects the same sources; no new schedule or service is created. API/RSS and `data/menu.json` retain their current-week contract. Calendar snapshots preserve source URL, capture time, original wording, advertised week and date provenance. A failed fetch/validation keeps the previous calendar rather than publishing a partial one.
 
-All dates shows every collected listing. Upcoming, This week, Next week and the compact date selector use **America/Los_Angeles**, with Monday–Sunday weeks and explicit event dates only. Undated recurring entries are not expanded into invented occurrences and remain in All dates with their source-week label. Starting a search clears date/day/type restrictions, searching all collected dates; filters can then refine the results. Reset returns the unfiltered root page.
+Date controls are ordered This week (the default), Next week, Upcoming, All dates. All dates shows every retained listing. The controls and compact date selector use **America/Los_Angeles**, with Monday–Sunday weeks and explicit event dates only. Undated recurring entries are not expanded into invented occurrences and remain in All dates with their source-week label. Starting a search clears date/day/type restrictions, searching all collected dates; filters can then refine the results. Reset returns the root page with This week selected. Explicit All dates selections round-trip in the URL. Global search never includes retired past weeks.
 
 Future listings are provisional according to the source. Exact duplicates merge provenance; conflicting terms remain distinct. Source week labels do not truncate explicit dates: the NYE page says week ending 2027-01-02 but lists Sunday 2027-01-03, which is retained with a warning. Event years are resolved from verified source week labels, never from collection timestamps.
+
+Successful, complete refreshes retire earlier-week events from the calendar snapshot using Las Vegas Monday midnight, keeping the whole current week and future weeks. Explicit event dates take precedence over source-week labels; undated recurring entries use their verified source week. Invalid, stale-current, partial or failed collections cannot replace either stored snapshot. The original current-menu API/RSS contract remains unchanged. At build time and in the browser, earlier-week cards are excluded even if the last successful snapshot is older; an open tab updates its cards and date choices across local Monday midnight. Git history is not rewritten.

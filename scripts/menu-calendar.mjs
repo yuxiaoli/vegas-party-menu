@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { parseMenu, SOURCE_URL } from './menu-source.mjs';
+import { lasVegasDate, weekRange, isRetainedEvent } from '../src/calendar-filters.js';
 
 export const INDEX_URL = 'https://halfsaintvegas.com/pages/upcoming-events';
 export const PROVISIONAL_NOTICE = 'Artists and guest-list details are provisional and confirmed by the source in the week of the event.';
@@ -72,7 +73,28 @@ export function buildCalendar(menus, fetchedAt) {
   return { schemaVersion: 1, timeZone: 'America/Los_Angeles', fetchedAt, menus, events: [...unique.values()], warnings };
 }
 
-export async function syncCalendar({ path = 'data/calendar.json', fetchImpl = fetch, now = () => new Date() } = {}) {
+// Prune persisted raw menu event rows as well as the search index. Source labels,
+// fetch timestamps and original wording remain unchanged for retained rows.
+export function retainCalendar(calendar, now = new Date()) {
+  const weekStart = weekRange(lasVegasDate(now)).start;
+  const eventBlock = /^((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?:\s*-\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))?(?:,?\s+\d{1,2}\/\d{1,2})?)\s*[–—-]\s*(.+)$/i;
+  const menus = calendar.menus.flatMap(menu => {
+    const events = menu.events.filter(event => isRetainedEvent({ ...resolveEventDate(event.dateText, menu.weekEnding), weekEnding: menu.weekEnding }, now));
+    if (!events.length) return [];
+    const keptRows = new Set(events.map(event => JSON.stringify([normal(event.dateText), normal(event.description)])));
+    const sections = menu.sections.map(section => ({ ...section, blocks: section.blocks.filter(block => {
+      if (!/^(Dayclubs|Nightclubs|After Parties)$/i.test(section.title)) return true;
+      const match = block.match(eventBlock);
+      return !match || keptRows.has(JSON.stringify([normal(match[1]), normal(match[2])]));
+    }) }));
+    return [{ ...menu, events, sections }];
+  });
+  const retained = buildCalendar(menus, calendar.fetchedAt);
+  if (!retained.events.length) throw new Error('No current-week or future events remain after validation');
+  return { ...calendar, ...retained, retention: { timeZone: 'America/Los_Angeles', weekStart, retiredEventCount: calendar.events.length - retained.events.length } };
+}
+
+export async function syncCalendar({ path = 'data/calendar.json', fetchImpl = fetch, now = () => new Date(), onCurrentMenu } = {}) {
   const timestamp = () => new Date(typeof now === 'function' ? now() : now).toISOString();
   const read = async url => {
     const response = await fetchImpl(url, { headers: { 'User-Agent': 'HalfSaintsMenuSync/1.0' }, signal: AbortSignal.timeout(30000), redirect: 'error' });
@@ -82,8 +104,10 @@ export async function syncCalendar({ path = 'data/calendar.json', fetchImpl = fe
     return { html, fetchedAt: timestamp() };
   };
   const current = await read(SOURCE_URL), index = await read(INDEX_URL);
+  const currentRefs = discoverMenus(current.html, SOURCE_URL), indexRefs = discoverMenus(index.html, INDEX_URL);
+  if (!indexRefs.length) throw new Error('Upcoming source index is empty or incomplete; previous snapshots retained');
   const refs = new Map();
-  for (const ref of [...discoverMenus(current.html, SOURCE_URL), ...discoverMenus(index.html, INDEX_URL)]) {
+  for (const ref of [...currentRefs, ...indexRefs]) {
     if (refs.has(ref.sourceUrl) && refs.get(ref.sourceUrl).weekEnding !== ref.weekEnding) throw new Error(`Conflicting week labels: ${ref.sourceUrl}`);
     refs.set(ref.sourceUrl, ref);
   }
@@ -100,7 +124,12 @@ export async function syncCalendar({ path = 'data/calendar.json', fetchImpl = fe
       menus[i] = { ...menu, sourceTitle: title, linkLabel: ref.label, isCurrent: ref.sourceUrl === SOURCE_URL, provisional: ref.sourceUrl !== SOURCE_URL, provisionalNotice: ref.sourceUrl === SOURCE_URL ? null : PROVISIONAL_NOTICE };
     }
   }));
-  const calendar = buildCalendar(menus, timestamp());
+  const completedAt = timestamp();
+  const currentMenu = menus.find(menu => menu.isCurrent);
+  const currentWeek = weekRange(lasVegasDate(new Date(completedAt)));
+  if (!currentMenu || currentMenu.weekEnding < currentWeek.start || currentMenu.weekEnding > currentWeek.end) throw new Error('Current source week is stale or does not match the current Las Vegas week; previous snapshots retained');
+  const calendar = retainCalendar(buildCalendar(menus, completedAt), new Date(completedAt));
+  if (onCurrentMenu) await onCurrentMenu(currentMenu);
   calendar.discovery = { sources: [{ sourceUrl: SOURCE_URL, fetchedAt: current.fetchedAt }, { sourceUrl: INDEX_URL, fetchedAt: index.fetchedAt }], rawEventCount: menus.reduce((n, m) => n + m.events.length, 0) };
   const target = resolve(path), temporary = `${target}.${randomUUID()}.tmp`;
   await mkdir(dirname(target), { recursive: true });
