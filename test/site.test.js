@@ -92,7 +92,8 @@ test('personal credit is integrated into the light footer with its exact author 
 test('dress code is an attributed concise guide, not invented venue rules or modified menu data', () => {
   const html = renderSite(menu, current, now), $ = load(html), section = $('#dress-code');
   assert.equal(section.length, 1);assert.equal(section.find('h3').length, 3);
-  assert.equal(section.closest('.source-notes').length, 1);assert.equal(section[0].name, 'details');assert.notEqual(section.attr('open'), undefined);
+  assert.equal(section.closest('.source-notes').length, 1);assert.equal(section[0].name, 'details');assert.equal(section.attr('open'), undefined);
+  assert.deepEqual($('.source-details > details > summary').map((_,e)=>$(e).text().replace(/\s*\+$/, '').trim()).get(), ['LINKS','STRIP CLUB DEALS','UPCOMING EVENTS','DRESS CODE']);
   assert.equal(section.find('.dress-source').attr('href'), 'https://halfsaintvegas.com/pages/vegas-dress-code');
   assert.match(section.text(), /Half Saint/);assert.match(section.text(), /venue-specific requirements/);
   assert.match(section.text(), /essential medication/);assert.match(section.text(), /Source checked November 15, 2026/);
