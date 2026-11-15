@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {artistKey, matchArtist, renderDJProfile, renderCatalogNote, CATALOG_URL} from '../src/dj-catalog.js';
+import {artistKey, matchArtist, renderDJProfile, renderArtistName, CATALOG_URL} from '../src/dj-catalog.js';
 import {parseCatalogIndex, verifyProfile, loadDJCatalog} from '../scripts/dj-catalog.mjs';
 import {renderSite} from '../src/site.js';
 import menu from '../data/menu.json' with {type:'json'};
@@ -51,9 +51,8 @@ test('rendering preserves source menu and omits missing biography fields and lab
  const dj=verifyProfile(profile,entry,detail);const catalog={status:'ok',year:2026,matchedListingCount:1,profiles:[dj]};
  const html=renderSite(menu,{source:'github'},new Date('2026-11-15T12:00:00Z'),catalog);
  assert.equal((html.match(/<article class="event-card"/g)||[]).length,41);assert.equal((html.match(/class="dj-profile"/g)||[]).length,1);
- assert.match(html,/DJ MAG 2026/);assert.match(html,/#18/);assert.ok(!html.includes('<dt>From</dt>'));assert.ok(!html.includes('<dt>Known for</dt>'));assert.ok(!html.includes('>null<'));assert.match(html,/Annual poll, not a daily ranking/);
+ assert.match(html,/DJ MAG 2026/);assert.match(html,/#18/);assert.ok(!html.includes('<dt>From</dt>'));assert.ok(!html.includes('<dt>Best known for</dt>'));assert.ok(!html.includes('>null<'));assert.ok(!html.includes('Catalog record updated'));assert.ok(!html.includes('View DJ profile'));assert.ok(!html.includes('No DJ'));
  assert.ok(html.includes('Steve Aoki (9pm arrival!)'));assert.ok(html.includes(entry.detailUrl));assert.ok(!html.includes('<canvas'));
- assert.match(renderCatalogNote({status:'unavailable'}),/temporarily unavailable/);
  const bad={...dj,description:'<img src=x onerror=alert(1)>'};assert.ok(!renderDJProfile('Steve Aoki',{profiles:[bad]}).includes('<img'));
 });
 
@@ -69,4 +68,17 @@ test("footer uses Sean's saved credit and the renamed repository link",()=>{
  const html=renderSite(menu,{source:'github'});
  assert.match(html,/Built by <a href="https:\/\/www\.linkedin\.com\/in\/yuxiaoli\/"[^>]*>Sean<\/a> with ❤️/);
  assert.ok(html.includes('https://github.com/yuxiaoli/vegas-party-menu'));
+});
+
+test('compact card links the original artist name and shows only sourced ranking, From and Best known for',()=>{
+ const dj={...verifyProfile(profile,entry,detail),origin:'Example place',bestKnownFor:'Verified work',styles:['Do not render style'],description:'Do not render generated summary'};
+ const catalog={status:'ok',year:2026,matchedListingCount:1,profiles:[dj]};
+ const snippet=renderDJProfile('Steve Aoki (9pm arrival!)',catalog);
+ assert.match(snippet,/<dt>From<\/dt><dd>Example place<\/dd>/);
+ assert.match(snippet,/<dt>Best known for<\/dt><dd>Verified work<\/dd>/);
+ assert.ok(!snippet.includes('Do not render'));assert.ok(!snippet.includes('Catalog record updated'));assert.ok(!snippet.includes('View DJ profile'));
+ const name=renderArtistName('Steve Aoki (9pm arrival!)',catalog);
+ assert.ok(name.includes(`href="${entry.detailUrl}"`));assert.ok(name.includes('>Steve Aoki (9pm arrival!)</a>'));
+ for(const description of ['R&B Party','HipHop/Top40','Kaskade']) {assert.equal(renderDJProfile(description,catalog),'');assert.ok(!renderArtistName(description,catalog).includes('<a'));}
+ assert.ok(!renderDJProfile('Steve Aoki',{profiles:[{...dj,origin:'<script>bad</script>'}]}).includes('<script>'));
 });
