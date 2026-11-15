@@ -1,5 +1,5 @@
 export const CATALOG_URL = 'https://yuxiaoli.github.io/djmag-data/';
-const ARRIVAL_NOTE = /\s*(\(\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)\s+arrival!?\s*\))\s*$/i;
+const ARRIVAL_NOTE = /\s*(\(\s*(?:0?[1-9]|1[0-2])(?::?[0-5]\d)?\s*(?:am|pm)\s+arrival!?\s*\))\s*$/i;
 
 // Case/spacing normalization only. Remove only the menu's explicit arrival-time note,
 // never a generic parenthetical, a DJ prefix, a genre, a collaborator or a partial name.

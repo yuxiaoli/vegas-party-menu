@@ -100,7 +100,7 @@ test('only reviewed meaningful fragments are emphasized, preserving exact source
 
 test('arrival suffix stays plain in the heading; unmatched and ambiguous titles stay untouched',()=>{
  const catalog={profiles:[verifyProfile(profile,entry,detail)]};
- for(const title of ['Steve Aoki (9pm arrival!)','Steve Aoki (10:30pm arrival!)','Steve Aoki']) {
+ for(const title of ['Steve Aoki (9pm arrival!)','Steve Aoki (10:30pm arrival!)','Steve Aoki (930pm arrival!)','Steve Aoki (1230am arrival!)','Steve Aoki']) {
   const $=load('<h3>'+renderArtistHeading(title,catalog)+'</h3>');
   assert.equal($('h3').text(),title);assert.equal($('h3 a').text(),'Steve Aoki');assert.equal($('h3 a').attr('href'),entry.detailUrl);
   assert.ok(!$('h3 a').text().includes('arrival'));

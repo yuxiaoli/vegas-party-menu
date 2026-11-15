@@ -51,3 +51,11 @@ Dayclub/nightclub identities are kept separate, including Marquee. Drais Afterho
 ### Dress-code guide and credit
 
 The existing “The rest of the menu” area includes a concise, attributed summary of the [Half Saint dress-code guide](https://halfsaintvegas.com/pages/vegas-dress-code), checked November 15, 2026. It distinguishes dayclub/nightclub guidance, links the complete source, and notes that venue requirements and admission decisions may differ. This is presentation-only, not added source-event data or a new crawler/schedule. The exact personal credit appears within the light footer with a thin divider and left-aligned muted text; only Sean is linked.
+
+### All collected weeks and global search
+
+The website also publishes `data/calendar.json`: the current menu plus every week actually linked by the current menu and Upcoming Events index. The existing Monday 18:17 UTC sync collects the same sources; no new schedule or service is created. API/RSS and `data/menu.json` retain their current-week contract. Calendar snapshots preserve source URL, capture time, original wording, advertised week and date provenance. A failed fetch/validation keeps the previous calendar rather than publishing a partial one.
+
+All dates shows every collected listing. Upcoming, This week, Next week and the compact date selector use **America/Los_Angeles**, with Monday–Sunday weeks and explicit event dates only. Undated recurring entries are not expanded into invented occurrences and remain in All dates with their source-week label. Starting a search clears date/day/type restrictions, searching all collected dates; filters can then refine the results. Reset returns the unfiltered root page.
+
+Future listings are provisional according to the source. Exact duplicates merge provenance; conflicting terms remain distinct. Source week labels do not truncate explicit dates: the NYE page says week ending 2027-01-02 but lists Sunday 2027-01-03, which is retained with a warning. Event years are resolved from verified source week labels, never from collection timestamps.
