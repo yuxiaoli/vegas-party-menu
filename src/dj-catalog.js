@@ -14,14 +14,8 @@ export function matchArtist(description, profiles = []) {
   return matches.length === 1 ? matches[0] : null;
 }
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-export function renderArtistName(description, catalog) {
-  const label = escape(description || 'See source menu');
-  const dj = matchArtist(description, catalog?.profiles);
-  return dj ? `<a class="artist-detail" href="${escape(dj.detailUrl)}" target="_blank" rel="noopener noreferrer">${label}</a>` : label;
-}
 export function renderDJProfile(description, catalog) {
   const dj = matchArtist(description, catalog?.profiles);
   if (!dj) return '';
-  const facts = [dj.origin && `<div><dt>From</dt><dd>${escape(dj.origin)}</dd></div>`, dj.bestKnownFor && `<div><dt>Best known for</dt><dd>${escape(dj.bestKnownFor)}</dd></div>`].filter(Boolean).join('');
-  return `<aside class="dj-profile" aria-label="DJ profile for ${escape(dj.name)}"><a class="dj-rank" href="${escape(dj.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(dj.name)}, number ${dj.rank} in DJ Mag ${dj.year}">DJ MAG ${dj.year} <strong>#${dj.rank}</strong></a>${facts ? `<dl class="dj-facts">${facts}</dl>` : ''}</aside>`;
+  return `<aside class="dj-profile" aria-label="DJ profile for ${escape(dj.name)}"><a class="dj-name" href="${escape(dj.detailUrl)}" target="_blank" rel="noopener noreferrer">${escape(dj.name)}</a><a class="dj-rank" href="${escape(dj.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(dj.name)}, number ${dj.rank} in DJ Mag ${dj.year}">DJ MAG ${dj.year} <strong>#${dj.rank}</strong></a>${dj.origin ? `<p class="dj-from">From ${escape(dj.origin)}</p>` : ''}${dj.bestKnownFor ? `<p class="dj-known">${escape(dj.bestKnownFor)}</p>` : ''}</aside>`;
 }

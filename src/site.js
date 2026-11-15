@@ -1,4 +1,4 @@
-import { renderDJProfile, renderArtistName } from './dj-catalog.js';
+import { renderDJProfile } from './dj-catalog.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -29,7 +29,7 @@ export function renderSite(menu, snapshot, now = new Date(), djCatalog = null) {
     return `<article class="event-card" data-category="${escape(event.section)}" data-days="${escape(eventDays(event.dateText).join(' '))}" data-search="${escape([event.venue, event.description, event.details, event.dateText].join(' ').toLowerCase())}">
       <div class="card-top"><span class="kind kind-${kind}">${escape(event.section)}</span><span class="event-number">${String(index + 1).padStart(2, '0')}</span></div>
       <p class="event-date">${escape(event.dateText || 'Date not specified')}${weekly ? '<span class="recurring">Recurring · dates not specified</span>' : ''}</p>
-      <h3>${renderArtistName(event.description, djCatalog)}</h3>
+      <h3>${escape(event.description || 'See source menu')}</h3>
       <p class="venue">${escape(event.venue || 'Venue not specified')}</p>
       ${renderDJProfile(event.description, djCatalog)}
       <div class="entry"><span class="entry-label">THE DETAILS</span><p>${escape(event.details || 'No entry details provided. Check the original menu.')}</p></div>
@@ -78,7 +78,7 @@ const STYLES = `
 @media(max-width:700px){.event-grid{grid-template-columns:1fr;gap:15px}.event-card{padding:22px 22px 19px}.kind{font-size:8px;padding:7px 9px;letter-spacing:.9px}.event-number{font-size:10px}.event-date{font-size:11px;line-height:1.5}.recurring{font-size:10px}.event-card h3{font-size:29px;letter-spacing:-.9px;overflow-wrap:normal}.venue{font-size:10px;letter-spacing:.4px;margin-bottom:22px}.entry{padding:17px 0}.entry-label{font-size:8px}.entry p{font-size:13px;line-height:1.75}.source-link{font-size:11px;padding-top:15px;min-height:35px;align-items:center}.source-link span{font-size:17px}.category-tabs button{min-height:44px}.day-tabs button{min-height:36px}.search-box{min-height:42px}}
 @media(max-width:380px){.hero{grid-template-columns:minmax(0,1fr) 118px;gap:9px}h1{font-size:37px;letter-spacing:-2.4px}h1 span{letter-spacing:-2.1px}.ticket-date strong{font-size:23px}.ticket-symbol{font-size:54px}.ticket-top{font-size:6px}.ticket-bottom>span{display:none}.ticket-bottom{justify-content:center}.brand-mark{font-size:26px}.wordmark{font-size:18px}.event-grid{grid-template-columns:1fr}.event-card h3{font-size:27px}.entry p{font-size:13px}.event-date,.venue,.source-link{font-size:11px}.kind{font-size:8px}.day-tabs button{padding:7px 6px}}
 @media(max-width:700px){.category-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}.category-tabs button{text-align:left;padding:12px 14px}}
-.personal-credit{margin:0;padding:18px 5%;text-align:center;background:var(--ink);color:var(--paper);font-size:12px;line-height:1.6}.personal-credit a{text-underline-offset:4px}.artist-detail{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:5px}.artist-detail:hover{text-decoration-thickness:2px}.dj-profile{margin:0 0 20px;background:#eeeaf7;padding:14px;border:1px solid #d8d1e5}.dj-rank{font-size:10px;text-decoration:none;display:inline-flex;gap:9px;align-items:center;white-space:nowrap}.dj-rank strong{font-size:20px;letter-spacing:-.5px}.dj-facts{margin:12px 0 0;font-size:12px;line-height:1.6}.dj-facts div{display:grid;grid-template-columns:88px minmax(0,1fr);gap:8px;margin-top:7px}.dj-facts dt{font-weight:700}.dj-facts dd{margin:0;overflow-wrap:anywhere}@media(max-width:700px){.dj-profile{padding:16px}.dj-rank{font-size:11px}.dj-facts{font-size:12px}}
+.personal-credit{margin:0;padding:18px 5%;text-align:center;background:var(--ink);color:var(--paper);font-size:12px;line-height:1.6}.personal-credit a{text-underline-offset:4px}.dj-profile{margin:0 0 20px;background:#eeeaf7;padding:14px;border:1px solid #d8d1e5;text-align:left}.dj-name{display:block;font-size:16px;font-weight:700;line-height:1.5;margin-bottom:8px;text-underline-offset:4px;overflow-wrap:anywhere}.dj-rank{font-size:10px;text-decoration:none;display:flex;width:fit-content;gap:9px;align-items:center;white-space:nowrap}.dj-rank strong{font-size:20px;letter-spacing:-.5px}.dj-from,.dj-known{font-size:12px;line-height:1.65;margin:10px 0 0;text-align:left;overflow-wrap:anywhere}@media(max-width:700px){.dj-profile{padding:16px}.dj-name{font-size:18px}.dj-rank{font-size:11px}}
 
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.event-card{transition:none}.event-card:hover{transform:none}}
 `;
