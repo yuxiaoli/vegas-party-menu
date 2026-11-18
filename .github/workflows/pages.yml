@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'src/**'
+      - 'test/**'
       - 'scripts/build-site.mjs'
       - 'scripts/dj-catalog.mjs'
       - 'scripts/venue-catalog.mjs'
