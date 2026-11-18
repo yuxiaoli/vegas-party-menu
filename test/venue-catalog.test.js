@@ -5,7 +5,10 @@ import {CATALOG_URL} from '../src/dj-catalog.js';
 import {VENUE_ALIASES, VENUE_INDEX_URL, reviewedVenue, renderVenueName} from '../src/venue-catalog.js';
 import {parseVenueIndex, verifyVenue, loadVenueCatalog} from '../scripts/venue-catalog.mjs';
 import {renderSite} from '../src/site.js';
-import menu from '../data/menu.json' with {type:'json'};
+// Fixed historical fixture: exact DJ/venue regression expectations must not drift with weekly sync.
+import menu from './fixtures/menu-2026-11-15.json' with {type:'json'};
+
+import currentMenu from '../data/menu.json' with {type:'json'};
 
 const index = {venues: VENUE_ALIASES.map(a => ({id:a.id,name:a.name,type:a.type,detail_url:`venues/${a.id}.html`,json_url:`data/venues/${a.id}.json`}))};
 const profile = a => ({id:a.id,name:a.name,listing_category:a.type,facts:{location:a.location},source:{url:a.sourceUrl,observed_at:'2026-11-15T00:00:00Z'},field_provenance:{location:{source_url:a.sourceUrl,retrieved_at:'2026-11-15T00:00:00Z'}}});
@@ -80,4 +83,27 @@ test('transient venue reads retry once, authorization errors never retry',async(
  assert.equal(calls,2);assert.equal(good.status,'ok');
  calls=0;const denied=await loadVenueCatalog(menu,{fetchImpl:async()=>{calls++;return new Response('Forbidden',{status:403});}});
  assert.equal(calls,1);assert.equal(denied.status,'unavailable');
+});
+
+// Keep the published snapshot covered too, without imposing a prior week's counts.
+test('current weekly snapshot preserves every event and only links verified exact matches', async () => {
+ const before=JSON.stringify(currentMenu);
+ const expected=currentMenu.events.filter(event=>reviewedVenue(event.venue));
+ const ids=new Set(expected.map(event=>reviewedVenue(event.venue).id));
+ const urls=[];
+ const catalog=await loadVenueCatalog(currentMenu,{fetchImpl:async url=>{urls.push(url);return fixtureFetch(url);}});
+ assert.equal(catalog.status,'ok');assert.equal(catalog.venues.length,ids.size);
+ assert.equal(catalog.matchedListingCount,expected.length);assert.equal(urls.length,1+2*ids.size);
+ const $=load(renderSite(currentMenu,{source:'github'},new Date(),null,catalog));
+ assert.equal($('.event-card').length,currentMenu.events.length);
+ assert.equal($('.venue-link').length,expected.length);
+ $('.event-card').each((i,el)=>{
+  const event=currentMenu.events[i],alias=reviewedVenue(event.venue),link=$(el).find('.venue a');
+  assert.equal($(el).find('h3').text(),event.description);
+  assert.equal($(el).find('.venue').text(),event.venue);
+  assert.equal($(el).find('.entry p').text(),event.details);
+  assert.equal(link.length,alias?1:0);
+  if(alias)assert.equal(link.attr('href'),CATALOG_URL+`venues/${alias.id}.html`);
+ });
+ assert.equal(JSON.stringify(currentMenu),before);
 });

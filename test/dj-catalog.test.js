@@ -4,7 +4,9 @@ import {load} from 'cheerio';
 import {artistKey, matchArtist, renderDJProfile, renderArtistHeading, renderKnownFor, CATALOG_URL} from '../src/dj-catalog.js';
 import {parseCatalogIndex, verifyProfile, loadDJCatalog} from '../scripts/dj-catalog.mjs';
 import {renderSite} from '../src/site.js';
-import menu from '../data/menu.json' with {type:'json'};
+// Fixed historical fixture: exact DJ/venue regression expectations must not drift with weekly sync.
+import menu from './fixtures/menu-2026-11-15.json' with {type:'json'};
+import currentMenu from '../data/menu.json' with {type:'json'};
 const entry={id:'steve-aoki',name:'Steve Aoki',rank:18,year:2026,detailUrl:CATALOG_URL+'djs/steve-aoki.html'};
 const source='https://djmag.com/top100djs/2026/18/steve-aoki';
 const profile={schema_version:'1.0.0',id:entry.id,name:entry.name,updated_at:'2026-11-15T00:00:00Z',rankings:[{year:2026,rank:18,source_url:source}],sources:[{url:source,retrieved_at:'2026-11-15T00:00:00Z',fields:['/rankings','/name']}],styles:[],origin:null,description:null};
@@ -118,4 +120,19 @@ test('profile link ends the panel with the original arrow character and no SVG',
  assert.equal($('.dj-profile').children().last().attr('class'),'dj-details');
  assert.equal(link.text().trim(),'View DJ profile ↗');assert.equal(link.attr('href'),entry.detailUrl);
  assert.equal(link.find('svg').length,0);assert.equal(link.attr('rel'),'noopener noreferrer');
+});
+
+test('current weekly DJ headings retain the exact refreshed arrival text', () => {
+ const dj=verifyProfile(profile,entry,detail),catalog={profiles:[dj]};
+ const $=load(renderSite(currentMenu,{source:'github'},new Date(),catalog));
+ assert.equal($('.event-card').length,currentMenu.events.length);
+ const expected=currentMenu.events.filter(event=>matchArtist(event.description,[entry]));
+ assert.equal($('.artist-link').length,expected.length);
+ assert.equal($('.dj-profile').length,expected.length);
+ $('.event-card').each((i,el)=>{
+  const event=currentMenu.events[i],link=$(el).find('h3 a');
+  assert.equal($(el).find('h3').text(),event.description);
+  assert.equal(link.length,matchArtist(event.description,[entry])?1:0);
+  if(link.length){assert.equal(link.text(),entry.name);assert.equal(link.attr('href'),entry.detailUrl);}
+ });
 });
