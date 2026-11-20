@@ -69,7 +69,7 @@ test('transient catalog reads retry once; authorization errors never retry',asyn
 
 test("footer uses Sean's saved credit and the renamed repository link",()=>{
  const html=renderSite(menu,{source:'github'});
- assert.match(html,/Built by <a href="https:\/\/www\.linkedin\.com\/in\/yuxiaoli\/"[^>]*>Sean<\/a> with ❤️/);
+ assert.match(html,/Built by <a href="https:\/\/s\.vectorindex\.cloud\/sean"[^>]*>Sean<\/a> with ❤️/);
  assert.ok(html.includes('https://github.com/yuxiaoli/vegas-party-menu'));
 });
 
