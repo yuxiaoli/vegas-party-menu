@@ -83,7 +83,7 @@ test('personal credit is integrated into the light footer with its exact author 
   const html = renderSite(menu, current, now), $ = load(html), credit = $('footer > .personal-credit');
   assert.equal(credit.length, 1);assert.equal(credit.text(), 'Built by Sean with ❤️');
   assert.equal(credit.find('a').length, 1);assert.equal(credit.find('a').text(), 'Sean');
-  assert.equal(credit.find('a').attr('href'), 'https://www.linkedin.com/in/yuxiaoli/');
+  assert.equal(credit.find('a').attr('href'), 'https://s.vectorindex.cloud/sean');
   const rule = html.match(/\.personal-credit\{([^}]+)\}/)[1];
   assert.match(rule, /border-top:1px solid var\(--line\)/);assert.match(rule, /color:var\(--muted\)/);
   assert.doesNotMatch(rule, /background:var\(--ink\)/);assert.match(rule, /text-align:left/);
