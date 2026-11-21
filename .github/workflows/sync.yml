@@ -2,7 +2,8 @@ name: Weekly menu sync
 
 on:
   schedule:
-    - cron: '17 18 * * 1'
+    - cron: '0 20 * * 3'
+      timezone: 'America/Los_Angeles'
   workflow_dispatch:
 
 permissions:
