@@ -38,7 +38,7 @@ Matching is case/spacing-insensitive and removes only a trailing explicit arriva
 
 The menu remains complete if the optional catalog is unavailable; unmatched entries remain unchanged. A failed or mismatched artist record is omitted rather than showing stale or invented details. Existing source JSON, API/RSS and Monday 18:17 UTC collection remain unchanged.
 
-Artist headings and profile buttons pass the page language to the DJ catalog using its published `lang` parameter. Ranking links go to the original DJ Mag source. The venue catalog currently publishes English detail pages.
+Artist headings and profile buttons pass the page language to the DJ catalog with its published `lang` parameter. Ranking links go to the original DJ Mag source.
 
 Repository and GitHub Pages name: `vegas-party-menu`. Previous GitHub repository URLs redirect, but GitHub does not guarantee redirects for the former Pages site path. Legacy Cloudflare API/RSS URLs and collector configuration are unchanged.
 
@@ -50,11 +50,11 @@ The English menu starts at `/vegas-party-menu/`. The language switch opens Simpl
 
 The build renders a static page for each locale from `src/messages.js`, sharing one browser script, the same source snapshots, and the same filter values. To add a language, register its code, native display name, and message catalog in that module. Missing messages fall back to English. Dates and times display in `America/Los_Angeles` and use the selected locale's formatting. Original artist names, venues, entry conditions, and source links remain on both pages. Search matches original event text and English/Chinese party-type and weekday labels in either language.
 
-The Chinese cards translate entry conditions during rendering. The rules in `src/entry-translation.js` cover the published menu's wording and common price, time, age, dress and guest list conditions. Readers can expand the original English beneath a translation. When new wording falls outside the verified rules, the card shows that clause in English with a Chinese notice. The source snapshot and entry search text retain the original wording.
+The Chinese cards show one translation of the entry conditions. The rules in `src/entry-translation.js` cover the published menu's wording and common price, time, age, dress and guest list conditions. If any condition falls outside those rules, the card refers readers to the original menu for the complete requirements. The source snapshot and entry search text retain the original wording.
 
 ## Venue detail links
 
-The existing venue name becomes a link only after a reviewed full-label alias matches the [published venue catalog](https://yuxiaoli.github.io/djmag-data/venues/index.html). The 11 aliases in `src/venue-catalog.js` record the expected catalog ID, canonical name, dayclub/nightclub type, hotel and original source URL. Every Pages build verifies the index, selected JSON records, source provenance and detail-page heading before emitting a link. `site-dist/data/venue-matches.json` records verification time and coverage.
+The existing venue name becomes a link only after a reviewed full-label alias matches the [published venue catalog](https://yuxiaoli.github.io/djmag-data/venues/index.html). The 11 aliases in `src/venue-catalog.js` record the expected catalog ID, canonical name, dayclub/nightclub type, hotel and original source URL. Every Pages build verifies the index, selected JSON records, source provenance and detail-page heading before emitting a link. In Chinese, the build uses the verified `venues/zh-CN/<id>.html` alternate for that same venue. The name appears as plain text if the localized page cannot be verified. `site-dist/data/venue-matches.json` records verification time and coverage.
 
 Dayclub/nightclub identities are kept separate, including Marquee. Drais Afterhours, La Jolla and Sapphire are currently unmatched and remain plain text. There is no fuzzy matching, hotel stripping or invented identity. A catalog outage or mismatched record simply omits optional links while retaining every menu card, its original wording and all DJ panels. Venue directory hours, policies and factual summaries never overwrite event-specific menu conditions. Reads use the published catalog only, with bounded concurrency and retries; there is no extra crawler or schedule. Existing source JSON, API/RSS and Monday 18:17 UTC collection remain unchanged.
 

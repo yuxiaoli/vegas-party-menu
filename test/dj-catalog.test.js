@@ -151,3 +151,15 @@ test('both James Hype profile links follow the menu language and keep the origin
  }
  assert.equal(catalog.profiles[0].detailUrl, detailUrl);
 });
+
+test('profile localization keeps the verified catalog path and artist ID', () => {
+ for (const detailUrl of [
+  'https://other.invalid/djmag-data/djs/steve-aoki.html',
+  CATALOG_URL + 'djs/james-hype.html',
+  'javascript:alert(1)'
+ ]) {
+  const catalog = { profiles: [{ ...entry, detailUrl }] };
+  assert.equal(renderArtistHeading('Steve Aoki', catalog, { locale: 'zh-CN' }), 'Steve Aoki');
+  assert.equal(renderDJProfile('Steve Aoki', catalog, { locale: 'zh-CN' }), '');
+ }
+});

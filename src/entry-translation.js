@@ -61,19 +61,34 @@ function schedule(value) {
   const startTime = time(sharedPeriod ? start + sharedPeriod : start);
   const endTime = end && time(end);
   if (!startTime || (end && !endTime)) return null;
-  if (endTime) {
-    // For shorthand with only one AM/PM marker, avoid inferring an overnight start time.
-    if (sharedPeriod && startTime > endTime) return null;
-    const overnight = startTime > endTime ? '次日 ' : '';
-    return `${when ? when + ' ' : ''}${startTime}–${overnight}${endTime}${until ? '（原文在时段前标注“截至”）' : ''}`;
-  }
-  return `${when ? when + ' ' : ''}${until ? '截至 ' : ''}${startTime}`;
+  // For shorthand with only one AM/PM marker, avoid inferring an overnight start time.
+  if (sharedPeriod && startTime > endTime) return null;
+  return { when, until, startTime, endTime };
 }
 
-const scheduleText = (value, prefix) => {
-  const formatted = schedule(value);
-  return formatted && `${prefix}${formatted}`;
-};
+function formatSchedule({ when, until, startTime, endTime }) {
+  const dayPrefix = when ? `${when} ` : '';
+  if (!endTime) return `${dayPrefix}${until ? '截至 ' : ''}${startTime}`;
+  const overnight = startTime > endTime ? '次日 ' : '';
+  const sourceNote = until ? '（来源同时使用了“截至”的说法）' : '';
+  return `${dayPrefix}${startTime}–${overnight}${endTime}${sourceNote}`;
+}
+
+function scheduleText(value, prefix) {
+  const hours = schedule(value);
+  return hours && `${prefix}${formatSchedule(hours)}`;
+}
+
+function openBar(value, guests = '') {
+  const hours = schedule(value);
+  if (!hours) return null;
+  const offer = guests ? `${guests}可享用免费酒水` : '吧台供应免费酒水';
+  if (hours.until && !hours.endTime) {
+    const dayPrefix = hours.when ? `${hours.when}，` : '';
+    return `${dayPrefix}${offer}，供应至 ${hours.startTime}`;
+  }
+  return `${offer}，时段为 ${formatSchedule(hours)}`;
+}
 
 const price = '\\$\\s?\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?|\\$\\s?\\d+(?:\\.\\d{2})?';
 const ticketPrice = `(${price})(?:\\s*(?:[-–—]|to)\\s*(${price}))?`;
@@ -83,7 +98,7 @@ function freeAdmission(person, condition) {
   const base = `${who(person)}可免费入场`;
   if (!condition) return base;
   if (/^no ratio needed$/i.test(condition)) return `${base}，无人数比例要求`;
-  if (/^with any girl in (?:the )?group$/i.test(condition)) return `${base}，须同组至少有一位女士`;
+  if (/^with any girl in (?:the )?group$/i.test(condition)) return `${who(person)}的同行者中至少有一位女士，方可免费入场`;
   const ratio = condition.match(/^w(?:\/|ith) (\d+\s*:\s*\d+) ratio$/i);
   if (ratio) return `${base}，须满足 ${ratio[1]} 的人数比例`;
   const early = condition.match(/^with (very )?early arrival(?: (.+))?$/i);
@@ -94,7 +109,7 @@ function freeAdmission(person, condition) {
   const cutoff = condition.match(/^before (.+)$/i);
   if (cutoff) {
     const until = schedule(cutoff[1]);
-    return until && `${who(person)}在 ${until} 前可免费入场`;
+    return until && `${who(person)}在 ${formatSchedule(until)} 前可免费入场`;
   }
   const except = condition.match(/^except (.+)$/i);
   const when = days(except ? except[1] : condition);
@@ -147,7 +162,7 @@ const ageCondition = '(?:ages? |(?:guests )?must be )?(\\d{2})(?:\\+| or older| 
 const idType = '(valid )?(government[- ]issued )?(photo )?ID';
 const ageLimit = age => `仅限年满 ${age} 岁者入场`;
 const proofOfIdentity = (valid, government, photo) =>
-  `须出示${valid ? '有效的' : ''}${government ? '政府签发的' : ''}${photo ? '带照片的' : ''}身份证件`;
+  `须出示${government ? '政府签发' : ''}${government && photo ? '且' : ''}${photo ? '带照片' : ''}${government || photo ? '的' : ''}${valid ? '有效' : ''}身份证件`;
 const entryPrice = '(?:cover(?: charge)?|entry(?: fee)?|admission(?: fee)?|tickets?)';
 
 const rules = [
@@ -160,13 +175,13 @@ const rules = [
   }],
   [new RegExp(`^${audience} (?:are )?free(?: (?:admission|entry))?(?: (.+))?$`, 'i'), (_, guests, qualifier) => freeAdmission(guests, qualifier)],
   [new RegExp(`^${audience} pay reduced (.+)$`, 'i'), (_, guests, when) => days(when) && `${who(guests)}${days(when)}享优惠入场价`],
-  [new RegExp(`^${audience} open bar free drinks (.+)$`, 'i'), (_, guests, when) => scheduleText(when, `${who(guests)}可在吧台享用免费酒水，时段：`)],
-  [/^open bar free drinks (.+)$/i, (_, when) => scheduleText(when, '吧台供应免费酒水，时段：')],
+  [new RegExp(`^${audience} open bar free drinks (.+)$`, 'i'), (_, guests, when) => openBar(when, who(guests))],
+  [/^open bar free drinks (.+)$/i, (_, when) => openBar(when)],
   [new RegExp(`^${audience} (\\d+) free drink tickets?$`, 'i'), (_, guests, count) => `${who(guests)}可领取 ${count} 张免费酒水券`],
   [new RegExp(`^${audience} drink tickets (.+); open bar free drinks (.+)$`, 'i'), (_, guests, ticketDays, barHours) => {
     const when = days(ticketDays);
-    const hours = schedule(barHours);
-    return when && hours && `${who(guests)}${when}可领取酒水券；吧台供应免费酒水，时段：${hours}`;
+    const bar = openBar(barHours);
+    return when && bar && `${who(guests)}${when}可领取酒水券；${bar}`;
   }],
   [new RegExp(`^${audience} drink tickets (.+)$`, 'i'), (_, guests, when) => days(when) && `${who(guests)}${days(when)}可领取酒水券`],
   [new RegExp(`^${audience} complimentary champagne (.+)$`, 'i'), (_, guests, when) => scheduleText(when, `${who(guests)}可免费领取香槟，时段：`)],
@@ -180,7 +195,10 @@ const rules = [
       return `票价：${amount(base, end)}${startingAt ? '起' : ''}${qualifier}`;
     }],
   [new RegExp(`^${ticketPrice} ${entryPrice}$`, 'i'), (_, base, end) => `票价：${amount(base, end)}`],
-  [new RegExp(`^free (?:entry |admission )?before (${clock})$`, 'i'), (_, until) => scheduleText(until, '免费入场截止时间：')],
+  [new RegExp(`^free (?:entry |admission )?before (${clock})$`, 'i'), (_, until) => {
+    const cutoff = time(until);
+    return cutoff && `${cutoff} 前可免费入场`;
+  }],
   [/^(?:free (?:entry|admission)|no cover(?: charge)?)$/i, () => '免费入场'],
   [/^free (?:entry|admission) with (?:an? )?(RSVP|guest ?list registration)$/i, (_, requirement) =>
     `免费入场，${/^rsvp$/i.test(requirement) ? '须提前回复确认出席' : '须登记宾客名单'}`],

@@ -1,6 +1,7 @@
 import { createFormatters, createTranslator, DEFAULT_LOCALE } from './messages.js';
+import { catalogDetailUrl } from './djmag-links.js';
 
-export const CATALOG_URL = 'https://yuxiaoli.github.io/djmag-data/';
+export { CATALOG_URL } from './djmag-links.js';
 const ARRIVAL_NOTE = /\s*(\(\s*(?:0?[1-9]|1[0-2])(?::?[0-5]\d)?\s*(?:am|pm)\s+arrival!?\s*\))\s*$/i;
 const defaultT = createTranslator();
 const defaultFormat = createFormatters();
@@ -19,19 +20,18 @@ export function matchArtist(description, profiles = []) {
   return matches.length === 1 ? matches[0] : null;
 }
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-function localizedDetailUrl(detailUrl, locale) {
-  const url = new URL(detailUrl);
-  // DJ Mag Data gives an explicit query value priority over its browser preference.
-  url.searchParams.set('lang', locale === 'zh-CN' ? locale : 'en');
-  return url.href;
+function localizedDetailUrl(dj, locale) {
+  if (!dj || dj.detailUrl !== catalogDetailUrl('djs', dj.id)) return null;
+  return catalogDetailUrl('djs', dj.id, locale);
 }
 
 export function renderArtistHeading(description, catalog, { t = defaultT, locale = DEFAULT_LOCALE } = {}) {
   const dj = matchArtist(description, catalog?.profiles);
-  if (!dj) return escape(description || t('card.artistUnknown'));
+  const href = localizedDetailUrl(dj, locale);
+  if (!href) return escape(description || t('card.artistUnknown'));
   const original = String(description);
   const noteStart = original.match(ARRIVAL_NOTE)?.index ?? original.length;
-  return `<a class="artist-link" href="${escape(localizedDetailUrl(dj.detailUrl, locale))}" target="_blank" rel="noopener noreferrer">${escape(original.slice(0, noteStart))}</a>${escape(original.slice(noteStart))}`;
+  return `<a class="artist-link" href="${escape(href)}" target="_blank" rel="noopener noreferrer">${escape(original.slice(0, noteStart))}</a>${escape(original.slice(noteStart))}`;
 }
 // Presentation-only emphasis reviewed against this exact sourced sentence. If the
 // record changes, retain plain text rather than guess which words are significant.
@@ -44,10 +44,11 @@ export function renderKnownFor(dj) {
 }
 export function renderDJProfile(description, catalog, { t = defaultT, format = defaultFormat, locale = DEFAULT_LOCALE } = {}) {
   const dj = matchArtist(description, catalog?.profiles);
-  if (!dj) return '';
+  const href = localizedDetailUrl(dj, locale);
+  if (!href) return '';
   const rank = format.number(dj.rank);
   const year = format.number(dj.year, { useGrouping: false });
   const profileLabel = t('card.djProfile', { artist: dj.name });
   const rankLabel = t('card.djRank', { artist: dj.name, rank, year });
-  return `<aside class="dj-profile" aria-label="${escape(profileLabel)}"><a class="dj-rank" href="${escape(dj.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(rankLabel)}">DJ MAG ${escape(year)} <strong>#${escape(rank)}</strong></a>${dj.origin ? `<p class="dj-from">${escape(t('card.djFrom'))} <strong lang="en">${escape(dj.origin)}</strong></p>` : ''}${dj.bestKnownFor ? `<p class="dj-known" lang="en">${renderKnownFor(dj)}</p>` : ''}<a class="dj-details" href="${escape(localizedDetailUrl(dj.detailUrl, locale))}" target="_blank" rel="noopener noreferrer">${escape(t('card.djLink'))}</a></aside>`;
+  return `<aside class="dj-profile" aria-label="${escape(profileLabel)}"><a class="dj-rank" href="${escape(dj.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(rankLabel)}">DJ MAG ${escape(year)} <strong>#${escape(rank)}</strong></a>${dj.origin ? `<p class="dj-from">${escape(t('card.djFrom'))} <strong lang="en">${escape(dj.origin)}</strong></p>` : ''}${dj.bestKnownFor ? `<p class="dj-known" lang="en">${renderKnownFor(dj)}</p>` : ''}<a class="dj-details" href="${escape(href)}" target="_blank" rel="noopener noreferrer">${escape(t('card.djLink'))}</a></aside>`;
 }

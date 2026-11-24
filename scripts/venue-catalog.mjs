@@ -1,5 +1,5 @@
 import { load } from 'cheerio';
-import { CATALOG_URL } from '../src/dj-catalog.js';
+import { CATALOG_URL, catalogDetailUrl } from '../src/djmag-links.js';
 import { VENUE_INDEX_URL, reviewedVenue, venueKey } from '../src/venue-catalog.js';
 
 const validDate = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
@@ -41,6 +41,25 @@ export function verifyVenue(profile, entry, alias, detailHtml) {
   return {id: alias.id, name: profile.name, type: alias.type, location: profile.facts.location, detailUrl: new URL(entry.detail_url, CATALOG_URL).href, sourceUrl: source.url, observedAt: source.observed_at};
 }
 
+async function verifyChineseVenue(record, canonicalHtml, fetchImpl, deadline) {
+  const expectedUrl = catalogDetailUrl('venues', record.id, 'zh-CN');
+  const $ = load(canonicalHtml);
+  const advertised = $('a[hreflang="zh-CN"][href], link[rel="alternate"][hreflang="zh-CN"][href]').toArray().some(link => {
+    const href = $(link).attr('href');
+    return URL.canParse(href, record.detailUrl) && new URL(href, record.detailUrl).href === expectedUrl;
+  });
+  if (!advertised) return;
+
+  try {
+    const page = load(await read(expectedUrl, fetchImpl, deadline));
+    if (page('html').attr('lang') === 'zh-CN' && venueKey(page('h1').first().text()) === venueKey(record.name)) {
+      record.detailUrls = { 'zh-CN': expectedUrl };
+    }
+  } catch {
+    // The original venue match remains available for the English menu.
+  }
+}
+
 export async function loadVenueCatalog(menu, {fetchImpl = fetch, now = new Date()} = {}) {
   const result = {schemaVersion: 1, indexUrl: VENUE_INDEX_URL, checkedAt: now.toISOString(), status: 'unavailable', catalogCount: 0, matchedListingCount: 0, failedVenues: 0, venues: []};
   const deadline = Date.now() + 120000;
@@ -57,7 +76,9 @@ export async function loadVenueCatalog(menu, {fetchImpl = fetch, now = new Date(
           if (!entry || venueKey(entry.name) !== venueKey(alias.name) || entry.type !== alias.type) throw new Error('Reviewed venue absent or changed');
           // Read only selected published records. Never crawl the external venue source.
           const [json, html] = await Promise.all([read(new URL(entry.json_url, CATALOG_URL).href, fetchImpl, deadline), read(new URL(entry.detail_url, CATALOG_URL).href, fetchImpl, deadline)]);
-          verified.set(alias.id, verifyVenue(JSON.parse(json), entry, alias, html));
+          const record = verifyVenue(JSON.parse(json), entry, alias, html);
+          await verifyChineseVenue(record, html, fetchImpl, deadline);
+          verified.set(alias.id, record);
         } catch { result.failedVenues++; }
       }
     };
