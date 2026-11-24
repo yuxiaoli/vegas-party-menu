@@ -1,8 +1,21 @@
+import { createTranslator, LOCALES } from './messages.js';
+
 export const DEFAULT_PERIOD = 'This week';
 export const PERIODS = ['This week', 'Next week', 'Upcoming', 'All'];
 export const TIME_ZONE = 'America/Los_Angeles';
+export const CATEGORIES = ['Dayclubs', 'Nightclubs', 'After Parties'];
+export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const translators = Object.keys(LOCALES).map(createTranslator);
+const normalizeSearch = text => String(text ?? '').normalize('NFKC').trim().toLowerCase();
+const categoryTerms = new Map(CATEGORIES.map(id => [id, translators.map(t => normalizeSearch(t(`category.${id}`)))]));
+const dayTerms = new Map(DAYS.map(id => [id, translators.flatMap(t => [
+  normalizeSearch(t(`day.${id}`)), normalizeSearch(t(`dayShort.${id}`))
+])]));
+const noTerms = [];
+const vegasDateFormat = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+
 export function lasVegasDate(now = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'}).format(now);
+  return vegasDateFormat.format(now);
 }
 export function weekRange(today, offset = 0) {
   const date = new Date(`${today}T12:00:00Z`);
@@ -25,12 +38,19 @@ export function dateMatches(event, period = DEFAULT_PERIOD, selectedDate = '', n
   const range = weekRange(today, period === 'Next week' ? 1 : 0);
   return Boolean(event.eventDate && event.eventDate >= range.start && event.eventDate <= range.end);
 }
+export function filterMenu(events, state = {}) {
+  const query = normalizeSearch(state.query);
+  return events.filter(event => {
+    const days = event.days || noTerms;
+    return (!state.category || state.category === 'All' || event.section === state.category)
+      && (!state.day || state.day === 'All' || days.includes(state.day))
+      && (!query || normalizeSearch(event.search).includes(query)
+        || (categoryTerms.get(event.section) || noTerms).some(term => term.includes(query))
+        || days.some(day => (dayTerms.get(day) || noTerms).some(term => term.includes(query))));
+  });
+}
 export function filterCalendar(events, state = {}, now = new Date()) {
-  const query = (state.query || '').trim().toLowerCase();
-  return events.filter(event => dateMatches(event, state.period || DEFAULT_PERIOD, state.date || '', now)
-    && (!state.category || state.category === 'All' || event.section === state.category)
-    && (!state.day || state.day === 'All' || event.days.includes(state.day))
-    && (!query || event.search.includes(query)));
+  return filterMenu(events, state).filter(event => dateMatches(event, state.period || DEFAULT_PERIOD, state.date || '', now));
 }
 export function globalSearchState(query) { return {query, period: 'All', date: '', day: 'All', category: 'All'}; }
 
