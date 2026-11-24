@@ -1,8 +1,10 @@
-import { isRetainedEvent, PERIODS, DEFAULT_PERIOD } from './calendar-filters.js';
+import { isRetainedEvent, PERIODS, DEFAULT_PERIOD, DAYS, CATEGORIES } from './calendar-filters.js';
 import { renderDJProfile, renderArtistHeading } from './dj-catalog.js';
 import { renderVenueName } from './venue-catalog.js';
+import { createFormatters, createTranslator, DEFAULT_LOCALE, LOCALES } from './messages.js';
+import { getFreshnessStatus } from './freshness.js';
+import { localeBootstrapScript } from './locale-navigation.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export function eventDays(dateText) {
   const text = String(dateText || '');
@@ -14,68 +16,178 @@ export function eventDays(dateText) {
   return Array.from({ length: (end - start + 7) % 7 + 1 }, (_, index) => DAYS[(start + index) % 7]);
 }
 
-export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, venueCatalog = null, calendar = null) {
-  if (calendar) menu = {...menu,events:menu.events.filter(event=>isRetainedEvent(event,now))};
-  const weekDate = menu.weekEnding && new Date(`${menu.weekEnding}T12:00:00Z`);
-  const knownWeek = weekDate && Number.isFinite(weekDate.getTime());
-  const weekLabel = knownWeek ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(weekDate) : 'Not specified by source';
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-  const stale = Boolean(knownWeek && today > menu.weekEnding);
+export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, venueCatalog = null, calendar = null, {
+  locale = DEFAULT_LOCALE, siteRoot = '/', clientScript = ''
+} = {}) {
+  const t = createTranslator(locale);
+  const format = createFormatters(locale);
+  const tr = (key, values) => escape(t(key, values));
+  const localized = locale !== DEFAULT_LOCALE;
+  const isPages = Boolean(clientScript);
+  const homeUrl = isPages ? './' : '/';
+  const rssUrl = `${siteRoot}rss.xml`;
+  const dataUrl = isPages ? `${siteRoot}data/menu.json` : '/api/menu';
+  const languageLinks = Object.entries(LOCALES).filter(([code]) => code !== locale).map(([code, label]) => {
+    const href = code === DEFAULT_LOCALE ? `${siteRoot}?lang=${code}` : `${siteRoot}${code}/`;
+    return `<a class="locale-link" href="${escape(href)}" data-locale-link="${code}" lang="${code}" hreflang="${code}">${escape(label)}</a>`;
+  }).join('');
+  const weekEnding = Number.isFinite(Date.parse(`${menu.weekEnding}T12:00:00Z`)) ? menu.weekEnding : '';
+  const weekLabel = weekEnding ? format.date(weekEnding) : t('freshness.unknownWeek');
+  const ticketDate = weekEnding ? format.date(weekEnding, { month: 'short', day: 'numeric' }).toUpperCase() : t('ticket.unknown');
+  const ticketYear = weekEnding ? format.date(weekEnding, { year: 'numeric' }) : t('ticket.unknownYear');
   const fallback = snapshot.source === 'bundled_fallback';
-  const status = fallback ? 'Backup snapshot' : stale ? 'Past menu week' : knownWeek ? 'Current menu week' : 'Menu date unknown';
-  const dateLabel = knownWeek ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(weekDate).toUpperCase() : 'TBC';
-  const venues = new Set(menu.events.map(event => event.venue).filter(Boolean)).size;
-  const captured = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Los_Angeles' }).format(new Date(menu.fetchedAt));
-  const dates = calendar ? [...new Set(menu.events.map(event => event.eventDate).filter(Boolean))].sort() : [];
-  const displayDate = iso => new Intl.DateTimeFormat('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric', timeZone:'UTC'}).format(new Date(iso + 'T12:00:00Z'));
-  const cards = menu.events.map((event, index) => {
+  const status = getFreshnessStatus(weekEnding, { now, calendar: isPages && Boolean(calendar), fallback, pages: isPages });
+  const captured = format.timestamp(menu.fetchedAt, { dateStyle: 'medium', timeStyle: 'short' });
+  const events = calendar ? menu.events.filter(event => isRetainedEvent(event, now)) : menu.events;
+  const venues = new Set(events.map(event => event.venue).filter(Boolean)).size;
+  const dates = calendar ? [...new Set(events.map(event => event.eventDate).filter(Boolean))].sort() : [];
+  const displayDate = iso => format.date(iso, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const cards = events.map((event, index) => {
     const kind = event.section === 'Dayclubs' ? 'day' : event.section === 'After Parties' ? 'late' : 'night';
     const weekly = !/\d{1,2}\/\d{1,2}/.test(event.dateText || '');
-    const dateLabel = calendar && event.eventDate ? displayDate(event.eventDate) : event.dateText || 'Date not specified';
-    const sourceWeekLabel = calendar && !event.eventDate ? ` · source week ending ${event.weekEnding || 'unknown'}` : '';
+    const dated = calendar && event.eventDate;
+    const dateLabel = dated ? displayDate(event.eventDate) : event.dateText || t('card.dateUnknown');
+    const sourceWeek = localized && event.weekEnding ? format.date(event.weekEnding) : event.weekEnding;
+    const sourceWeekLabel = calendar && !event.eventDate ? ` · ${tr('card.sourceWeek', { date: sourceWeek || t('card.sourceWeekUnknown') })}` : '';
     const provisional = calendar && event.provisional;
-    return `<article class="event-card" data-category="${escape(event.section)}"${calendar ? ` data-event-date="${escape(event.eventDate || '')}" data-week-ending="${escape(event.weekEnding || '')}"` : ''} data-days="${escape(eventDays(event.dateText).join(' '))}" data-search="${escape([event.venue, event.description, event.details, event.dateText].join(' ').toLowerCase())}">
-      <div class="card-top"><span class="kind kind-${kind}">${escape(event.section)}</span><span class="event-number">${String(index + 1).padStart(2, '0')}</span></div>
-      <p class="event-date">${escape(dateLabel)}${weekly ? `<span class="recurring">Recurring · dates not specified${escape(sourceWeekLabel)}</span>` : ''}${calendar && !weekly && !event.eventDate ? '<span class="recurring">Source date needs clarification</span>' : ''}${provisional ? '<span class="advance-listing">Advance listing · confirm in event week</span>' : ''}${calendar && event.dateWarnings?.length ? `<span class="advance-listing">Source date note: ${escape(event.dateWarnings.join('; '))}. Source week label: ${escape(event.weekEnding)}.</span>` : ''}</p>
-      <h3>${renderArtistHeading(event.description, djCatalog)}</h3>
-      <p class="venue">${renderVenueName(event.venue, venueCatalog)}</p>
-      ${renderDJProfile(event.description, djCatalog)}
-      <div class="entry"><span class="entry-label">THE DETAILS</span><p>${escape(event.details || 'No entry details provided. Check the original menu.')}</p></div>
+    return `<article class="event-card" data-category="${escape(event.section)}"${event.id ? ` data-event-id="${escape(event.id)}"` : ''}${calendar ? ` data-event-date="${escape(event.eventDate || '')}" data-week-ending="${escape(event.weekEnding || '')}"` : ''} data-days="${escape(eventDays(event.dateText).join(' '))}" data-search="${escape([event.venue, event.description, event.details, event.dateText].join(' '))}">
+      <div class="card-top"><span class="kind kind-${kind}">${CATEGORIES.includes(event.section) ? tr(`category.${event.section}`) : escape(event.section)}</span><span class="event-number">${format.number(index + 1, { minimumIntegerDigits: 2, useGrouping: false })}</span></div>
+      <p class="event-date">${dated ? `<time datetime="${escape(event.eventDate)}">${escape(dateLabel)}</time>` : escape(dateLabel)}
+        ${localized && dated && event.dateText ? `<span class="recurring">${tr('card.originalDate', { date: event.dateText })}</span>` : ''}
+        ${weekly ? `<span class="recurring">${tr('card.recurring')}${sourceWeekLabel}</span>` : ''}
+        ${calendar && !weekly && !event.eventDate ? `<span class="recurring">${tr('card.clarify')}</span>` : ''}
+        ${provisional ? `<span class="advance-listing">${tr('card.advance')}</span>` : ''}
+        ${calendar && event.dateWarnings?.length ? `<span class="advance-listing">${tr('card.dateWarning', { warning: event.dateWarnings.join('; ') })} ${tr('card.sourceWeekLabel', { date: sourceWeek })}</span>` : ''}</p>
+      <h3>${renderArtistHeading(event.description, djCatalog, { t, format })}</h3>
+      <p class="venue" data-venue="${escape(event.venue)}">${renderVenueName(event.venue, venueCatalog, { t, format })}</p>
+      ${renderDJProfile(event.description, djCatalog, { t, format })}
+      <div class="entry"><span class="entry-label">${tr('card.entryLabel')}</span><p${localized && event.details ? ' lang="en"' : ''}>${escape(event.details || t('card.entryUnknown'))}</p></div>
     </article>`;
   }).join('');
-  const extraSections = menu.sections.filter(section => !['Introduction', 'Dayclubs', 'Nightclubs', 'After Parties'].includes(section.title));
-  const originalSections = extraSections.map(section => `<details class="source-section"><summary>${escape(section.title)} <span aria-hidden="true">+</span></summary><div>${section.blocks.map(block => `<p>${escape(block)}</p>`).join('')}</div></details>`).join('');
+  const extraSections = menu.sections.filter(section => section.title !== 'Introduction' && !CATEGORIES.includes(section.title));
+  const originalSections = extraSections.map(section => `<details class="source-section"${localized ? ' lang="en"' : ''}><summary>${escape(section.title)} <span aria-hidden="true">+</span></summary><div>${section.blocks.map(block => `<p>${escape(block)}</p>`).join('')}</div></details>`).join('');
+  const calendarControls = calendar ? `
+    <div class="calendar-row">
+      <div class="period-tabs" role="group" aria-label="${tr('filter.periodLabel')}">${PERIODS.map(period => `<button type="button" data-period="${period}" aria-pressed="${period === DEFAULT_PERIOD}">${tr(`period.${period}`)}</button>`).join('')}</div>
+      <label class="date-choice">${tr('filter.specificDate')} <select id="calendar-date"><option value="">${tr('filter.chooseDate')}</option>${dates.map(date => `<option value="${escape(date)}">${escape(displayDate(date))}</option>`).join('')}</select></label>
+    </div>
+    <p id="date-filter-note" class="date-filter-note">${tr('filter.initialNote')}</p>` : '';
+  const calendarCoverage = calendar ? `
+    <aside class="calendar-coverage"><strong>${tr('coverage.menus', { count: format.number(calendar.menus.length) })}</strong>
+      <span>${dates.length ? tr('coverage.through', { date: displayDate(dates.at(-1)) }) : tr('coverage.unavailable')} · ${tr('coverage.timeZone')}</span>
+      <p>${tr('coverage.captured', { date: format.timestamp(calendar.fetchedAt, { dateStyle: 'medium' }) })} ${tr('coverage.notice')}
+        <a href="https://halfsaintvegas.com/pages/upcoming-events" target="_blank" rel="noopener noreferrer">${tr('coverage.source')}</a> · <a href="${escape(siteRoot)}data/calendar.json">${tr('coverage.data')}</a>
+      </p>
+    </aside>` : '';
   return `<!doctype html>
-<html lang="en">
+<html lang="${escape(locale)}">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vegas Parties · Your weekly party menu</title>
-<meta name="description" content="Explore the weekly Las Vegas party menu. Browse dayclubs, nightclubs and after parties, with artist, venue and day filters.">
+<title>${tr('page.title')}</title>
+<meta name="description" content="${tr('page.description')}">
 <meta name="theme-color" content="#e7fa58">
-<meta property="og:title" content="Vegas Parties · Your weekly party menu"><meta property="og:description" content="Your week in Vegas. Explore dayclubs, nightclubs and after parties in one weekly menu.">
-<link rel="alternate" type="application/rss+xml" title="Vegas Parties weekly party menu" href="/rss.xml">
+<meta property="og:title" content="${tr('page.title')}"><meta property="og:description" content="${tr('page.ogDescription')}">
+<link rel="alternate" type="application/rss+xml" title="${tr('page.rssTitle')}" href="${escape(rssUrl)}">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e7fa58'/%3E%3Cpath d='M32 6l5 18 17-8-10 16 14 12-19-2-7 17-7-17-19 2 14-12L10 16l17 8z' fill='%231b1b19'/%3E%3C/svg%3E">
+${isPages && !localized ? `<script>${localeBootstrapScript}</script>` : ''}
 <style>${STYLES}</style>
 </head>
 <body>
-<a class="skip-link" href="#lineup">Skip to the lineup</a>
-<header class="site-header"><a class="wordmark" href="/" aria-label="Vegas Parties home"><span class="brand-mark" aria-hidden="true">✳</span> VEGAS PARTIES<span class="brand-note">THE VEGAS EDIT</span></a><nav aria-label="Main navigation"><a href="#lineup">The lineup <span aria-hidden="true">↘</span></a><a href="#before-you-go">Before you go</a><a class="nav-source" href="${escape(menu.sourceUrl)}" target="_blank" rel="noopener noreferrer">Original menu ↗</a></nav></header>
+<a class="skip-link" href="#lineup">${tr('nav.skip')}</a>
+<header class="site-header">
+  <a class="wordmark" href="${homeUrl}" aria-label="${tr('nav.home')}"><span class="brand-mark" aria-hidden="true">✳</span> VEGAS PARTIES<span class="brand-note">${tr('nav.brandNote')}</span></a>
+  <nav aria-label="${tr('nav.name')}">
+    <a href="#lineup">${tr('nav.lineup')} <span aria-hidden="true">↘</span></a>
+    <a href="#before-you-go">${tr('nav.before')}</a>
+    <a class="nav-source" href="${escape(menu.sourceUrl)}" target="_blank" rel="noopener noreferrer">${tr('nav.source')}</a>
+  </nav>
+  ${isPages ? `<nav class="language-links" aria-label="${tr('nav.language')}">${languageLinks}</nav>` : ''}
+</header>
 <main>
-<section class="hero" aria-labelledby="hero-title"><div class="hero-copy"><div class="eyebrow"><span class="status-dot"></span> LAS VEGAS, NEVADA <span class="hero-coordinate">36.1699° N / 115.1398° W</span></div><h1 id="hero-title">Your week.<br><span>In Vegas.</span></h1><div class="hero-bottom"><p>Good music. Late nights. Your kind of trouble.<br>${calendar ? 'This week and the weeks ahead, all in one place.' : 'The weekly party menu, all in one place.'}</p><a class="primary-link" href="#lineup">Find your night <span aria-hidden="true">↘</span></a></div></div><aside class="week-ticket" aria-label="Menu week"><div class="ticket-top"><span>YOUR WEEK<br>IN VEGAS</span><span class="ticket-arrow" aria-hidden="true">↗</span></div><div class="ticket-symbol" aria-hidden="true">✳</div><div class="ticket-date"><span>WEEK ENDING</span><strong>${escape(dateLabel)}</strong><span>${knownWeek ? weekDate.getUTCFullYear() : 'SOURCE DATE UNKNOWN'}</span></div><div class="ticket-bottom"><span>NO PLANS?<br>START HERE.</span><div class="barcode" aria-hidden="true"></div></div></aside></section>
-<div class="ticker" aria-hidden="true"><span>DAYLIGHT TO AFTER HOURS</span><span>✳</span><span>FIND YOUR FREQUENCY</span><span>✳</span><span>WHAT HAPPENS THIS WEEK</span><span>✳</span></div>
-<section class="menu-status${fallback || stale || !knownWeek ? ' status-warning' : ''}" aria-label="Menu freshness"><div><span class="status-dot"></span><strong>${status}</strong><span class="status-divider">/</span><span>Week ending ${escape(weekLabel)}</span></div><p>Collected ${escape(captured)} · Las Vegas time</p>${fallback ? '<p class="status-explanation">The latest snapshot could not be read. This is the backup saved with the website and may be older. Always check the original menu.</p>' : stale ? '<p class="status-explanation">This menu week has ended. We are showing the last available snapshot, not claiming these events are upcoming.</p>' : !knownWeek ? '<p class="status-explanation">The source did not specify a menu week. Collection time does not establish event dates.</p>' : ''}</section>
-${calendar ? `<aside class="calendar-coverage"><strong>${calendar.menus.length} collected menus</strong><span>${dates.length ? `Dated listings through ${displayDate(dates.at(-1))}` : 'Exact dates unavailable'} · Las Vegas time</span><p>Collected ${escape(new Intl.DateTimeFormat('en-US', {dateStyle:'medium',timeZone:'America/Los_Angeles'}).format(new Date(calendar.fetchedAt)))}. Future DJs and guest-list details are provisional until the event week. <a href="https://halfsaintvegas.com/pages/upcoming-events" target="_blank" rel="noopener noreferrer">Upcoming source menus ↗</a> · <a href="./data/calendar.json">All collected data ↗</a></p></aside>` : ''}
-<section class="lineup-section" id="lineup" aria-labelledby="lineup-heading"><div class="section-heading"><div><p class="eyebrow">01 / THE LINEUP</p><h2 id="lineup-heading">Find your <em>night.</em></h2></div><p class="lineup-summary"><strong>${menu.events.length}</strong> listings <span>/</span> <strong>${venues}</strong> venues<br><span class="small-note">Source details. No made-up promises.</span></p></div>
-<div class="filters" id="filters"${calendar ? ' data-calendar="true"' : ''} hidden><div class="filter-row"><div class="category-tabs" role="group" aria-label="Filter by party type"><button type="button" data-category-filter="All" aria-pressed="true">All parties <span>${menu.events.length}</span></button>${['Dayclubs','Nightclubs','After Parties'].map(category => `<button type="button" data-category-filter="${category}" aria-pressed="false">${category} <span>${menu.events.filter(event => event.section === category).length}</span></button>`).join('')}</div><label class="search-box"><span class="search-symbol" aria-hidden="true">⌕</span><span class="sr-only">${calendar ? 'Search all dates by artist, venue or details' : 'Search artist, venue or details'}</span><input id="search" type="search" placeholder="Artist, venue, your vibe…" autocomplete="off"></label></div>${calendar ? `<div class="calendar-row"><div class="period-tabs" role="group" aria-label="Filter by date range">${PERIODS.map(period=>`<button type="button" data-period="${period}" aria-pressed="${period === DEFAULT_PERIOD}">${period === 'All' ? 'All dates' : period}</button>`).join('')}</div><label class="date-choice">Specific date <select id="calendar-date"><option value="">Choose a date</option>${dates.map(date=>`<option value="${date}">${displayDate(date)}</option>`).join('')}</select></label></div><p id="date-filter-note" class="date-filter-note">This week is selected. Search spans this week and all collected future dates.</p>` : ''}<div class="days-row"><span class="filter-label">PICK A DAY</span><div class="day-tabs" role="group" aria-label="Filter by day"><button type="button" data-day="All" aria-pressed="true">All week</button>${DAYS.map(day=>`<button type="button" data-day="${day}" aria-pressed="false" aria-label="${day}">${day.slice(0,3)}</button>`).join('')}</div><button id="clear" class="clear-button" type="button" hidden>Reset filters ↺</button></div></div>
-<div class="results-heading"><p id="result-count" role="status" aria-live="polite">Showing all ${menu.events.length} listings</p><p>Entry is subject to the source's conditions <span aria-hidden="true">↙</span></p></div><div class="event-grid" id="event-grid">${cards}</div><div class="empty-state" id="empty-state" hidden><span aria-hidden="true">✳</span><h3>Different night. Same possibilities.</h3><p>No listings match those filters. Try another day, artist or venue.</p><button id="empty-reset" type="button">${calendar ? 'Back to this week ↗' : 'See the full lineup ↗'}</button></div>
-<noscript><p class="no-script">All listings are shown. Enable JavaScript to search and filter.</p></noscript>
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-copy">
+    <div class="eyebrow"><span class="status-dot"></span> ${tr('hero.location')} <span class="hero-coordinate">36.1699° N / 115.1398° W</span></div>
+    <h1 id="hero-title">${tr('hero.titleFirst')}<br><span>${tr('hero.titleSecond')}</span></h1>
+    <div class="hero-bottom"><p>${tr('hero.tagline')}<br>${tr(calendar ? 'hero.calendarDescription' : 'hero.weeklyDescription')}</p><a class="primary-link" href="#lineup">${tr('hero.findNight')} <span aria-hidden="true">↘</span></a></div>
+  </div>
+  <aside class="week-ticket" aria-label="${tr('ticket.label')}">
+    <div class="ticket-top"><span>${tr('ticket.topFirst')}<br>${tr('ticket.topSecond')}</span><span class="ticket-arrow" aria-hidden="true">↗</span></div>
+    <div class="ticket-symbol" aria-hidden="true">✳</div>
+    <div class="ticket-date"><span>${tr('ticket.weekEnding')}</span><strong>${escape(ticketDate)}</strong><span>${escape(ticketYear)}</span></div>
+    <div class="ticket-bottom"><span>${tr('ticket.bottomFirst')}<br>${tr('ticket.bottomSecond')}</span><div class="barcode" aria-hidden="true"></div></div>
+  </aside>
 </section>
-<section class="before-section" id="before-you-go" aria-labelledby="before-title"><div class="before-intro"><p class="eyebrow">02 / THE FINE PRINT</p><h2 id="before-title">The plan.<br>Before the party.</h2><p>Read the details, then check with the source. This is a guide to the menu, not a booking or a guarantee of entry.</p><a href="${escape(menu.sourceUrl)}" target="_blank" rel="noopener noreferrer">Go to the original menu ↗</a></div><div class="before-rules"><div><span>01</span><h3>Get your confirmation.</h3><p>The source says you need a confirmation text from the guest-list organizer before heading out. This site cannot add you to a guest list.</p></div><div><span>02</span><h3>Read every condition.</h3><p>Arrival windows, group ratios and drink offers vary by venue. The original wording is kept with each listing. Check the source before making plans.</p></div><div><span>03</span><h3>A snapshot, not a live promise.</h3><p>Menus are collected weekly. Times shown by venues are their original text; we do not invent publication dates or specific dates for recurring listings.</p></div></div></section>
-
-<section class="source-notes" aria-labelledby="source-notes-title"><div><p class="eyebrow">03 / FROM THE SOURCE</p><h2 id="source-notes-title">The rest of the menu.</h2><p>Additional source sections, preserved for context.</p></div><div class="source-details">${originalSections}<details class="source-section dress-code" id="dress-code"><summary>DRESS CODE <span aria-hidden="true">+</span></summary><div><p>Quick summary of Half Saint’s guide. Confirm venue-specific requirements before going; admission remains at management’s discretion.</p><div class="dress-items"><div><h3>Dayclubs</h3><p>Choose swimwear, with a cover-up for walking through casinos. Avoid sports shorts, undershirt tanks, jerseys and pro-team caps. Do not pair socks with sandals.</p></div><div><h3>Nightclubs</h3><p><strong>Men:</strong> collared shirts, V-necks or plain tees (not white); trousers or jeans with belt loops, no drawstrings or shorts. <strong>Women:</strong> dressy attire; sandals require a back strap, and avoid joggers, stretch leggings or sweats. <strong>Both:</strong> no heavily torn jeans or hard-toe boots. Athletic footwear is permitted by this guide.</p></div><div><h3>Pack light</h3><p>The guide restricts large bags, vapes/cannabis, weapons, outside refreshments, containers, eye-care liquids and professional camera equipment. It also lists medication restrictions; check directly with the venue about essential medication.</p></div></div><a class="dress-source" href="https://halfsaintvegas.com/pages/vegas-dress-code" target="_blank" rel="noopener noreferrer">Read the full dress-code guide ↗</a><p class="dress-observed">Source checked November 15, 2026. This summary is not a venue-specific policy.</p></div></details></div></section>
+<div class="ticker" aria-hidden="true"><span>${tr('ticker.daylight')}</span><span>✳</span><span>${tr('ticker.frequency')}</span><span>✳</span><span>${tr('ticker.happens')}</span><span>✳</span></div>
+<section class="menu-status${status.warning ? ' status-warning' : ''}" aria-label="${tr('freshness.label')}" data-week-ending="${escape(weekEnding)}"${fallback ? ' data-fallback' : ''}>
+  <div><span class="status-dot"></span><strong>${tr(`freshness.${status.key}`)}</strong><span class="status-divider">/</span><span>${tr('freshness.weekEnding', { date: weekLabel })}</span></div>
+  <p>${tr('freshness.captured', { date: captured })}</p>
+  <p class="status-explanation">${tr(`freshnessExplanation.${status.key}`)}</p>
+</section>
+${calendarCoverage}
+<section class="lineup-section" id="lineup" aria-labelledby="lineup-heading">
+  <div class="section-heading">
+    <div><p class="eyebrow">${tr('lineup.eyebrow')}</p><h2 id="lineup-heading">${tr('lineup.titleFirst')} <em>${tr('lineup.titleSecond')}</em></h2></div>
+    <p class="lineup-summary"><strong>${format.number(events.length)}</strong> ${tr('lineup.listings')} <span>/</span> <strong>${format.number(venues)}</strong> ${tr('lineup.venues')}<br><span class="small-note">${tr('lineup.note')}</span></p>
+  </div>
+  <div class="filters" id="filters"${calendar ? ' data-calendar="true"' : ''} hidden>
+    <div class="filter-row">
+      <div class="category-tabs" role="group" aria-label="${tr('filter.typeLabel')}">
+        <button type="button" data-category-filter="All" aria-pressed="true">${tr('category.All')} <span>${format.number(events.length)}</span></button>
+        ${CATEGORIES.map(category => `<button type="button" data-category-filter="${category}" aria-pressed="false">${tr(`category.${category}`)} <span>${format.number(events.filter(event => event.section === category).length)}</span></button>`).join('')}
+      </div>
+      <label class="search-box"><span class="search-symbol" aria-hidden="true">⌕</span><span class="sr-only">${tr(calendar ? 'filter.calendarSearchLabel' : 'filter.searchLabel')}</span><input id="search" type="search" placeholder="${tr('filter.placeholder')}" autocomplete="off"></label>
+    </div>
+    ${calendarControls}
+    <div class="days-row">
+      <span class="filter-label">${tr('filter.pickDay')}</span>
+      <div class="day-tabs" role="group" aria-label="${tr('filter.dayLabel')}">
+        <button type="button" data-day="All" aria-pressed="true">${tr('day.All')}</button>
+        ${DAYS.map(day => `<button type="button" data-day="${day}" aria-pressed="false" aria-label="${tr(`day.${day}`)}">${tr(`dayShort.${day}`)}</button>`).join('')}
+      </div>
+      <button id="clear" class="clear-button" type="button" hidden>${tr('filter.reset')}</button>
+    </div>
+    <p id="filter-error" role="status" hidden>${tr('filter.invalid')}</p>
+  </div>
+  <div class="results-heading"><p id="result-count" role="status" aria-live="polite">${tr('results.all', { total: format.number(events.length) })}</p><p>${tr('lineup.conditions')} <span aria-hidden="true">↙</span></p></div>
+  <div class="event-grid" id="event-grid">${cards}</div>
+  <div class="empty-state" id="empty-state" hidden><span aria-hidden="true">✳</span><h3>${tr('results.emptyTitle')}</h3><p>${tr('results.emptyText')}</p><button id="empty-reset" type="button">${tr(calendar ? 'results.calendarReset' : 'results.weeklyReset')}</button></div>
+  <noscript><p class="no-script">${tr('results.noScript')}</p></noscript>
+</section>
+<section class="before-section" id="before-you-go" aria-labelledby="before-title">
+  <div class="before-intro"><p class="eyebrow">${tr('before.eyebrow')}</p><h2 id="before-title">${tr('before.titleFirst')}<br>${tr('before.titleSecond')}</h2><p>${tr('before.description')}</p><a href="${escape(menu.sourceUrl)}" target="_blank" rel="noopener noreferrer">${tr('before.source')}</a></div>
+  <div class="before-rules">
+    ${['confirmation', 'conditions', 'snapshot'].map((key, index) => `<div><span>${format.number(index + 1, { minimumIntegerDigits: 2 })}</span><h3>${tr(`before.${key}Title`)}</h3><p>${tr(`before.${key}Text`)}</p></div>`).join('')}
+  </div>
+</section>
+<section class="source-notes" aria-labelledby="source-notes-title">
+  <div><p class="eyebrow">${tr('source.eyebrow')}</p><h2 id="source-notes-title">${tr('source.title')}</h2><p>${tr('source.description')}</p></div>
+  <div class="source-details">
+    ${originalSections}<details class="source-section dress-code" id="dress-code"><summary>${tr('dress.label')} <span aria-hidden="true">+</span></summary>
+      <div><p>${tr('dress.description')}</p>
+        <div class="dress-items">
+          <div><h3>${tr('category.Dayclubs')}</h3><p>${tr('dress.day')}</p></div>
+          <div><h3>${tr('category.Nightclubs')}</h3><p><strong>${tr('dress.menLabel')}</strong> ${tr('dress.men')} <strong>${tr('dress.womenLabel')}</strong> ${tr('dress.women')} <strong>${tr('dress.bothLabel')}</strong> ${tr('dress.both')}</p></div>
+          <div><h3>${tr('dress.packTitle')}</h3><p>${tr('dress.packText')}</p></div>
+        </div>
+        <a class="dress-source" href="https://halfsaintvegas.com/pages/vegas-dress-code" target="_blank" rel="noopener noreferrer">${tr('dress.source')}</a>
+        <p class="dress-observed">${tr('dress.observed', { date: format.date('2026-11-15', { month: 'long', day: 'numeric', year: 'numeric' }) })}</p>
+      </div>
+    </details>
+  </div>
+</section>
 </main>
-<footer><div><a class="footer-brand" href="#">VEGAS PARTIES <span aria-hidden="true">✳</span></a><p>An independent, source-backed menu viewer.<br>Not affiliated with the original publisher or venues. No bookings handled here.</p></div><div class="footer-links"><a href="/rss.xml">RSS feed ↗</a><a href="/api/menu">JSON API ↗</a><a href="/openapi.json">API docs ↗</a><a href="https://github.com/yuxiaoli/vegas-party-menu" target="_blank" rel="noopener noreferrer">Source code ↗</a></div><p class="footer-signoff">YOUR WEEK.<br>YOUR VEGAS.</p><p class="personal-credit">Built by <a href="https://s.vectorindex.cloud/sean" target="_blank" rel="noopener noreferrer">Sean</a> with ❤️</p></footer>
-<script>${SCRIPT}</script>
+<footer>
+  <div><a class="footer-brand" href="#" lang="en">VEGAS PARTIES <span aria-hidden="true">✳</span></a><p>${tr('footer.description')}<br>${tr('footer.disclaimer')}</p></div>
+  <div class="footer-links">
+    <a href="${escape(rssUrl)}">${tr('footer.rss')}</a>
+    <a href="${escape(dataUrl)}">${tr(isPages ? 'footer.jsonSnapshot' : 'footer.jsonApi')}</a>
+    ${isPages ? '' : `<a href="/openapi.json">${tr('footer.apiDocs')}</a>`}
+    <a href="https://github.com/yuxiaoli/vegas-party-menu" target="_blank" rel="noopener noreferrer">${tr('footer.source')}</a>
+  </div>
+  <p class="footer-signoff">${tr('footer.signoffFirst')}<br>${tr('footer.signoffSecond')}</p>
+  <p class="personal-credit" lang="en">Built by <a href="https://s.vectorindex.cloud/sean" target="_blank" rel="noopener noreferrer">Sean</a> with ❤️</p>
+</footer>
+${clientScript ? `<script type="module" src="${escape(clientScript)}"></script>` : ''}
 </body></html>`;
 }
 
@@ -94,48 +206,17 @@ footer{flex-wrap:wrap;row-gap:24px}.personal-credit{flex-basis:100%;margin:0;pad
 .calendar-coverage{max-width:1332px;margin:0 5%;padding:18px 0;border-bottom:1px solid var(--line);font-size:11px;line-height:1.7;color:var(--muted)}.calendar-coverage>strong{color:var(--ink);margin-right:18px}.calendar-coverage p{margin:6px 0 0}.calendar-coverage a{text-underline-offset:3px}.calendar-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin-top:20px}.period-tabs{display:flex;flex-wrap:wrap;gap:5px}.period-tabs button{border:1px solid var(--line);background:transparent;padding:9px 13px;font-size:11px}.period-tabs button[aria-pressed=true]{background:var(--acid);border-color:var(--ink)}.date-choice{display:flex;align-items:center;gap:10px;font-size:10px;color:var(--muted)}.date-choice select{background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:9px;font:inherit;max-width:220px}.date-filter-note{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 0 0}.advance-listing{font-size:9px;font-weight:400;color:#696254;line-height:1.5;width:100%}@media(max-width:700px){.calendar-row{gap:12px}.period-tabs{width:100%;display:grid;grid-template-columns:repeat(2,1fr)}.period-tabs button{min-height:42px;padding:10px;text-align:left}.date-choice{width:100%;justify-content:space-between}.date-choice select{font-size:12px;min-height:42px;max-width:70%}.calendar-coverage>strong,.calendar-coverage>span{display:block}.advance-listing{font-size:10px}}
 .venue-link{text-decoration-line:underline;text-decoration-style:dotted;text-underline-offset:4px;overflow-wrap:anywhere}.venue-link:hover{text-decoration-style:solid}.venue-link:focus-visible{outline:2px solid currentColor;outline-offset:4px}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.event-card{transition:none}.event-card:hover{transform:none}}
+.site-header nav:not(.language-links){margin-left:auto}
+.site-header .language-links{flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.site-header .language-links .locale-link{display:inline-block;white-space:nowrap;border:1px solid var(--line);padding:9px 10px}
+#filter-error{margin:12px 0 0;font-size:11px;line-height:1.6;color:#974512}
+:lang(zh-CN) h1,:lang(zh-CN) h1 span,:lang(zh-CN) h2{letter-spacing:normal}
+:lang(zh-CN) h1{font-size:clamp(52px,6vw,94px);line-height:1.1}
+:lang(zh-CN) h1 span{font-style:normal}
+@media(max-width:700px){
+  .site-header{gap:10px}
+  .site-header .language-links .locale-link{font-size:11px;padding:9px 7px}
+  :lang(zh-CN) h1{font-size:clamp(28px,8.5vw,51px)}
+  :lang(zh-CN) .lineup-summary{white-space:normal;text-align:right}
+}
 `;
-
-const SCRIPT = `(() => {
-  const filters = document.getElementById('filters');
-  if (filters.hasAttribute('data-calendar')) return;
-  const cards = [...document.querySelectorAll('.event-card')];
-  const search = document.getElementById('search');
-  const categories = [...document.querySelectorAll('[data-category-filter]')];
-  const days = [...document.querySelectorAll('[data-day]')];
-  const clear = document.getElementById('clear');
-  const empty = document.getElementById('empty-state');
-  const params = new URLSearchParams(location.search);
-  let category = categories.some(button => button.dataset.categoryFilter === params.get('type')) ? params.get('type') : 'All';
-  let day = days.some(button => button.dataset.day === params.get('day')) ? params.get('day') : 'All';
-  search.value = params.get('q') || '';
-  function update(writeHistory = true) {
-    const query = search.value.trim().toLowerCase();
-    let count = 0;
-    cards.forEach(card => {
-      const visible = (category === 'All' || category === card.dataset.category) && (day === 'All' || card.dataset.days.split(' ').includes(day)) && (!query || card.dataset.search.includes(query));
-      card.hidden = !visible;
-      if (visible) count++;
-    });
-    categories.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.categoryFilter === category)));
-    days.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.day === day)));
-    const active = category !== 'All' || day !== 'All' || Boolean(query);
-    clear.hidden = !active;
-    empty.hidden = count !== 0;
-    document.getElementById('result-count').textContent = active ? 'Showing ' + count + ' of ' + cards.length + ' listings' : 'Showing all ' + cards.length + ' listings';
-    if (writeHistory) {
-      const url = new URL(location.href);
-      [['type',category],['day',day],['q',search.value.trim()]].forEach(([key,value]) => value && value !== 'All' ? url.searchParams.set(key,value) : url.searchParams.delete(key));
-      history.replaceState(null,'',url.pathname + url.search + url.hash);
-    }
-  }
-  categories.forEach(button => button.addEventListener('click', () => {category = button.dataset.categoryFilter; update();}));
-  days.forEach(button => button.addEventListener('click', () => {day = button.dataset.day; update();}));
-  search.addEventListener('input', () => update());
-  const reset = () => {category = 'All'; day = 'All'; search.value = ''; update();};
-  clear.addEventListener('click', () => {reset(); categories[0].focus();});
-  document.getElementById('empty-reset').addEventListener('click', () => {reset(); search.focus();});
-  addEventListener('popstate', () => {const p = new URLSearchParams(location.search);category = categories.some(b => b.dataset.categoryFilter === p.get('type')) ? p.get('type') : 'All';day = days.some(b => b.dataset.day === p.get('day')) ? p.get('day') : 'All';search.value = p.get('q') || '';update(false);});
-  update(false);
-  filters.hidden = false;
-})();`;

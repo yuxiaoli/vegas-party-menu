@@ -1,7 +1,9 @@
 import { CATALOG_URL } from './dj-catalog.js';
+import { createTranslator } from './messages.js';
 
 export const VENUE_INDEX_URL = new URL('data/venues/index.json', CATALOG_URL).href;
 export const venueKey = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
+const defaultT = createTranslator();
 
 // Reviewed 2026-11-15 against each published source record's name, category and hotel.
 // Match the entire menu label: never strip @hotel, dayclub, brunch, rooftop or afterhours.
@@ -27,12 +29,13 @@ export function reviewedVenue(value) {
 }
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-export function renderVenueName(value, catalog) {
-  const label = escape(value || 'Venue not specified');
+export function renderVenueName(value, catalog, { t = defaultT } = {}) {
+  const label = escape(value || t('card.venueUnknown'));
   const alias = reviewedVenue(value);
   if (!alias) return label;
   const matches = (catalog?.venues || []).filter(venue => venue.id === alias.id && venueKey(venue.name) === venueKey(alias.name) && venue.type === alias.type && venueKey(venue.location) === venueKey(alias.location));
   const expectedUrl = new URL(`venues/${alias.id}.html`, CATALOG_URL).href;
   if (matches.length !== 1 || matches[0].detailUrl !== expectedUrl) return label;
-  return `<a class="venue-link" href="${expectedUrl}" target="_blank" rel="noopener noreferrer" aria-label="${label}: venue details (opens in new tab)">${label}</a>`;
+  const detailsLabel = t('card.venueDetails', { venue: value });
+  return `<a class="venue-link" href="${expectedUrl}" target="_blank" rel="noopener noreferrer" aria-label="${escape(detailsLabel)}">${label}</a>`;
 }

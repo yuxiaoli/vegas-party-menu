@@ -42,6 +42,12 @@ Repository and GitHub Pages name: `vegas-party-menu`. Previous GitHub repository
 
 The root home URL defaults to This week. All dates shows every retained current/future-week event, matched or unmatched. Shared URLs with `q`, `day` or `type` parameters intentionally apply the existing search filters; use the root site URL when sharing the complete menu.
 
+### Website languages
+
+The English menu starts at `/vegas-party-menu/`. The language switch opens Simplified Chinese at `/vegas-party-menu/zh-CN/` and remembers the choice in this browser. The switch preserves search, filters, and the current section. Share the Chinese URL to open Chinese directly, or use `?lang=en` on the root URL to explicitly share English. Reset clears the filters and keeps the current language.
+
+The build renders a static page for each locale from `src/messages.js`, sharing one browser script, the same source snapshots, and the same filter values. To add a language, register its code, native display name, and message catalog in that module. Missing messages fall back to English. Dates and times display in `America/Los_Angeles` and use the selected locale's formatting. Original artist names, venues, entry conditions, and source links remain on both pages. Search matches original event text and English/Chinese party-type and weekday labels in either language.
+
 ## Venue detail links
 
 The existing venue name becomes a link only after a reviewed full-label alias matches the [published venue catalog](https://yuxiaoli.github.io/djmag-data/venues/index.html). The 11 aliases in `src/venue-catalog.js` record the expected catalog ID, canonical name, dayclub/nightclub type, hotel and original source URL. Every Pages build verifies the index, selected JSON records, source provenance and detail-page heading before emitting a link. `site-dist/data/venue-matches.json` records verification time and coverage.

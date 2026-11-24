@@ -1,5 +1,9 @@
+import { createFormatters, createTranslator } from './messages.js';
+
 export const CATALOG_URL = 'https://yuxiaoli.github.io/djmag-data/';
 const ARRIVAL_NOTE = /\s*(\(\s*(?:0?[1-9]|1[0-2])(?::?[0-5]\d)?\s*(?:am|pm)\s+arrival!?\s*\))\s*$/i;
+const defaultT = createTranslator();
+const defaultFormat = createFormatters();
 
 // Case/spacing normalization only. Remove only the menu's explicit arrival-time note,
 // never a generic parenthetical, a DJ prefix, a genre, a collaborator or a partial name.
@@ -15,11 +19,12 @@ export function matchArtist(description, profiles = []) {
   return matches.length === 1 ? matches[0] : null;
 }
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-export function renderArtistHeading(description, catalog) {
+export function renderArtistHeading(description, catalog, { t = defaultT } = {}) {
   const dj = matchArtist(description, catalog?.profiles);
-  if (!dj) return escape(description || 'See source menu');
-  const note = String(description || '').match(ARRIVAL_NOTE)?.[1];
-  return `<a class="artist-link" href="${escape(dj.detailUrl)}" target="_blank" rel="noopener noreferrer">${escape(dj.name)}</a>${note ? ' ' + escape(note) : ''}`;
+  if (!dj) return escape(description || t('card.artistUnknown'));
+  const original = String(description);
+  const noteStart = original.match(ARRIVAL_NOTE)?.index ?? original.length;
+  return `<a class="artist-link" href="${escape(dj.detailUrl)}" target="_blank" rel="noopener noreferrer">${escape(original.slice(0, noteStart))}</a>${escape(original.slice(noteStart))}`;
 }
 // Presentation-only emphasis reviewed against this exact sourced sentence. If the
 // record changes, retain plain text rather than guess which words are significant.
@@ -30,8 +35,12 @@ export function renderKnownFor(dj) {
   return text.split(/(Calvin Harris|Swedish House Mafia|Usher|David Guetta)/)
     .map((part, index) => index % 2 ? `<strong>${escape(part)}</strong>` : escape(part)).join('');
 }
-export function renderDJProfile(description, catalog) {
+export function renderDJProfile(description, catalog, { t = defaultT, format = defaultFormat } = {}) {
   const dj = matchArtist(description, catalog?.profiles);
   if (!dj) return '';
-  return `<aside class="dj-profile" aria-label="DJ profile for ${escape(dj.name)}"><a class="dj-rank" href="${escape(dj.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(dj.name)}, number ${dj.rank} in DJ Mag ${dj.year}">DJ MAG ${dj.year} <strong>#${dj.rank}</strong></a>${dj.origin ? `<p class="dj-from">From <strong>${escape(dj.origin)}</strong></p>` : ''}${dj.bestKnownFor ? `<p class="dj-known">${renderKnownFor(dj)}</p>` : ''}<a class="dj-details" href="${escape(dj.detailUrl)}" target="_blank" rel="noopener noreferrer">View DJ profile ↗</a></aside>`;
+  const rank = format.number(dj.rank);
+  const year = format.number(dj.year, { useGrouping: false });
+  const profileLabel = t('card.djProfile', { artist: dj.name });
+  const rankLabel = t('card.djRank', { artist: dj.name, rank, year });
+  return `<aside class="dj-profile" aria-label="${escape(profileLabel)}"><a class="dj-rank" href="${escape(dj.sourceUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(rankLabel)}">DJ MAG ${escape(year)} <strong>#${escape(rank)}</strong></a>${dj.origin ? `<p class="dj-from">${escape(t('card.djFrom'))} <strong lang="en">${escape(dj.origin)}</strong></p>` : ''}${dj.bestKnownFor ? `<p class="dj-known" lang="en">${renderKnownFor(dj)}</p>` : ''}<a class="dj-details" href="${escape(dj.detailUrl)}" target="_blank" rel="noopener noreferrer">${escape(t('card.djLink'))}</a></aside>`;
 }
