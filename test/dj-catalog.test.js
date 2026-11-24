@@ -8,6 +8,7 @@ import {renderSite} from '../src/site.js';
 import menu from './fixtures/menu-2026-11-15.json' with {type:'json'};
 import currentMenu from '../data/menu.json' with {type:'json'};
 const entry={id:'steve-aoki',name:'Steve Aoki',rank:18,year:2026,detailUrl:CATALOG_URL+'djs/steve-aoki.html'};
+const englishDetailUrl = entry.detailUrl + '?lang=en';
 const source='https://djmag.com/top100djs/2026/18/steve-aoki';
 const profile={schema_version:'1.0.0',id:entry.id,name:entry.name,updated_at:'2026-11-15T00:00:00Z',rankings:[{year:2026,rank:18,source_url:source}],sources:[{url:source,retrieved_at:'2026-11-15T00:00:00Z',fields:['/rankings','/name']}],styles:[],origin:null,description:null};
 const detail='<h1>Steve Aoki</h1>';
@@ -82,8 +83,8 @@ test('matched heading links artist only; purple panel has rank, bold origin, kno
  cards.each((i,card)=>assert.equal($(card).find('h3').text(),menu.events[i].description));
  const panel=cards.filter((_,e)=>$(e).find('h3').text().startsWith('Steve Aoki')).find('.dj-profile');
  assert.deepEqual(panel.children().map((_,e)=>$(e).attr('class')).get(),['dj-rank','dj-from','dj-known','dj-details']);
- assert.equal(panel.find('.dj-name').length,0);assert.equal(panel.find('.dj-details').attr('href'),entry.detailUrl);assert.equal(panel.find('.dj-details').text().trim(),'View DJ profile ↗');
- assert.equal(cards.find('h3 a').attr('href'),entry.detailUrl);assert.equal(cards.find('h3 a').text(),'Steve Aoki');assert.equal(cards.find('.arrival-note').length,0);assert.equal(cards.find('h3 a').parent().text(),'Steve Aoki (9pm arrival!)');
+ assert.equal(panel.find('.dj-name').length,0);assert.equal(panel.find('.dj-details').attr('href'),englishDetailUrl);assert.equal(panel.find('.dj-details').text().trim(),'View DJ profile ↗');
+ assert.equal(cards.find('h3 a').attr('href'),englishDetailUrl);assert.equal(cards.find('h3 a').text(),'Steve Aoki');assert.equal(cards.find('.arrival-note').length,0);assert.equal(cards.find('h3 a').parent().text(),'Steve Aoki (9pm arrival!)');
  cards.each((i,card)=>assert.equal($(card).find('.entry p').text(),menu.events[i].details));
  assert.equal(panel.find('.dj-from').text(),'From Example place');assert.equal(panel.find('.dj-from strong').text(),'Example place');assert.equal(panel.find('.dj-known').text(),'Verified work');
  assert.ok(!panel.text().includes('Best known for'));assert.ok(!panel.text().includes('Do not render'));assert.ok(!panel.text().includes('Catalog record updated'));assert.ok(panel.text().includes('View DJ profile '));
@@ -104,7 +105,7 @@ test('arrival suffix stays plain in the heading; unmatched and ambiguous titles 
  const catalog={profiles:[verifyProfile(profile,entry,detail)]};
  for(const title of ['Steve Aoki (9pm arrival!)','Steve Aoki (10:30pm arrival!)','Steve Aoki (930pm arrival!)','Steve Aoki (1230am arrival!)','Steve Aoki']) {
   const $=load('<h3>'+renderArtistHeading(title,catalog)+'</h3>');
-  assert.equal($('h3').text(),title);assert.equal($('h3 a').text(),'Steve Aoki');assert.equal($('h3 a').attr('href'),entry.detailUrl);
+  assert.equal($('h3').text(),title);assert.equal($('h3 a').text(),'Steve Aoki');assert.equal($('h3 a').attr('href'),englishDetailUrl);
   assert.ok(!$('h3 a').text().includes('arrival'));
   if(title.includes('arrival'))assert.equal($('h3').contents().last()[0].type,'text');
  }
@@ -118,7 +119,7 @@ test('profile link ends the panel with the original arrow character and no SVG',
  const $=load(renderDJProfile('Steve Aoki',{profiles:[dj]}));
  const link=$('.dj-details');
  assert.equal($('.dj-profile').children().last().attr('class'),'dj-details');
- assert.equal(link.text().trim(),'View DJ profile ↗');assert.equal(link.attr('href'),entry.detailUrl);
+ assert.equal(link.text().trim(),'View DJ profile ↗');assert.equal(link.attr('href'),englishDetailUrl);
  assert.equal(link.find('svg').length,0);assert.equal(link.attr('rel'),'noopener noreferrer');
 });
 
@@ -133,6 +134,20 @@ test('current weekly DJ headings retain the exact refreshed arrival text', () =>
   const event=currentMenu.events[i],link=$(el).find('h3 a');
   assert.equal($(el).find('h3').text(),event.description);
   assert.equal(link.length,matchArtist(event.description,[entry])?1:0);
-  if(link.length){assert.equal(link.text(),entry.name);assert.equal(link.attr('href'),entry.detailUrl);}
+  if(link.length){assert.equal(link.text(),entry.name);assert.equal(link.attr('href'),englishDetailUrl);}
  });
+});
+
+test('both James Hype profile links follow the menu language and keep the original ranking source', () => {
+ const detailUrl = CATALOG_URL + 'djs/james-hype.html';
+ const sourceUrl = 'https://djmag.com/top100djs/2026/51/james-hype';
+ const catalog = { profiles: [{ name: 'James Hype', id: 'james-hype', rank: 51, year: 2026, detailUrl, sourceUrl }] };
+ const fixture = { ...menu, events: [{ ...menu.events[0], description: 'James Hype' }] };
+ for (const locale of ['en', 'zh-CN']) {
+  const $ = load(renderSite(fixture, { source: 'github' }, new Date('2026-11-15T12:00:00Z'), catalog, null, null, { locale }));
+  assert.equal($('.artist-link').attr('href'), detailUrl + '?lang=' + locale);
+  assert.equal($('.dj-details').attr('href'), detailUrl + '?lang=' + locale);
+  assert.equal($('.dj-rank').attr('href'), sourceUrl);
+ }
+ assert.equal(catalog.profiles[0].detailUrl, detailUrl);
 });
