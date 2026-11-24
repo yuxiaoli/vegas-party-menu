@@ -49,6 +49,64 @@ test('loader reads only selected published records, deduplicates and preserves m
  assert.equal(JSON.stringify(menu),before);
 });
 
+test('Chinese venue links require the published alternate and keep the same venue identity', async () => {
+ const alias = VENUE_ALIASES.find(a => a.id === 'omnia-nightclub');
+ const canonical = CATALOG_URL + `venues/${alias.id}.html`;
+ const localized = CATALOG_URL + `venues/zh-CN/${alias.id}.html`;
+ const event = { ...menu.events[0], venue: alias.menuVenue };
+ const fixture = { ...menu, events: [event] };
+ const urls = [];
+ const catalog = await loadVenueCatalog(fixture, {
+  fetchImpl: async url => {
+   urls.push(url);
+   if (url === canonical) return new Response(`<h1>${alias.name}</h1><a href="zh-CN/${alias.id}.html" hreflang="zh-CN">简体中文</a>`);
+   if (url === localized) return new Response(`<html lang="zh-CN"><h1>${alias.name}</h1></html>`);
+   return fixtureFetch(url);
+  }
+ });
+ assert.equal(catalog.venues[0].detailUrl, canonical);
+ assert.deepEqual(catalog.venues[0].detailUrls, { 'zh-CN': localized });
+ assert.equal(urls.filter(url => url === localized).length, 1);
+ for (const [locale, href] of [['en', canonical], ['zh-CN', localized]]) {
+  const $ = load(renderSite(fixture, { source: 'github' }, new Date(), null, catalog, null, { locale }));
+  assert.equal($('.venue-link').attr('href'), href);
+  assert.equal($('.venue-link').text(), alias.menuVenue);
+ }
+ const invalid = { venues: [{ ...catalog.venues[0], detailUrls: { 'zh-CN': CATALOG_URL + 'venues/zh-CN/xs-nightclub.html' } }] };
+ assert.equal(renderVenueName(alias.menuVenue, invalid, { locale: 'zh-CN' }), alias.menuVenue);
+});
+
+test('unavailable or mismatched Chinese pages keep the label plain and the English link active', async () => {
+ const alias = VENUE_ALIASES[0];
+ const canonical = CATALOG_URL + `venues/${alias.id}.html`;
+ const localized = CATALOG_URL + `venues/zh-CN/${alias.id}.html`;
+ const relative = `zh-CN/${alias.id}.html`;
+ const variants = [
+  { href: 'https://other.invalid/venue' },
+  { href: 'zh-CN/other-venue.html' },
+  { href: relative, status: 404 },
+  { href: relative, html: `<html lang="en"><h1>${alias.name}</h1></html>` },
+  { href: relative, html: '<html lang="zh-CN"><h1>Other venue</h1></html>' }
+ ];
+ for (const { href, html, status } of variants) {
+  let localizedRequests = 0;
+  const catalog = await loadVenueCatalog({ events: [{ venue: alias.menuVenue }] }, {
+   fetchImpl: async url => {
+    if (url === canonical) return new Response(`<h1>${alias.name}</h1><a href="${href}" hreflang="zh-CN">简体中文</a>`);
+    if (url === localized) {
+     localizedRequests++;
+     return new Response(html, { status });
+    }
+    return fixtureFetch(url);
+   }
+  });
+  assert.equal(catalog.status, 'ok');
+  assert.equal(localizedRequests, Number(href === relative));
+  assert.equal(renderVenueName(alias.menuVenue, catalog, { locale: 'zh-CN' }), alias.menuVenue);
+  assert.equal(load(renderVenueName(alias.menuVenue, catalog))('a').attr('href'), canonical);
+ }
+});
+
 test('optional venue failure keeps every original card, DJ content and unknown labels quiet',async()=>{
  const a=VENUE_ALIASES[0];
  const partial=await loadVenueCatalog(menu,{fetchImpl:async url=>url===CATALOG_URL+`data/venues/${a.id}.json`?new Response('{}'):fixtureFetch(url)});

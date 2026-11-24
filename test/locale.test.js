@@ -53,11 +53,14 @@ test('Pages renders both languages with the same source records, filter IDs, and
   assert.equal(en('.entry > p').text(), event.details);
   assert.match(zh('.entry > p').first().text(), /免费/);
   assert.match(zh('.entry > p').first().text(), /提早|提前|早到/);
-  assert.equal(zh('.entry-original summary').text(), t('card.entryOriginal'));
-  assert.equal(zh('.entry-original p[lang="en"]').text(), event.details);
+  assert.equal(zh('.entry > p').length, 1);
+  assert.equal(zh('.entry details, .entry button, .entry [lang="en"]').length, 0);
+  assert.doesNotMatch(zh('.entry').text(), /查看英文原文|Girls and guys free/);
+  assert.ok(zh('.event-card').attr('data-search').includes(event.details));
   assert.equal(zh('.event-date time').attr('datetime'), event.eventDate);
   assert.match(zh('.event-date time').text(), /2026年11月15日/);
-  assert.ok(zh('.event-date').text().includes(event.dateText));
+  assert.ok(!zh('.event-date').text().includes(event.dateText));
+  assert.ok(zh('.event-card').attr('data-search').includes(event.dateText));
   assert.equal(zh('[data-day="Sunday"]').attr('aria-label'), t('day.Sunday'));
   assert.equal(zh('[data-period="This week"]').text(), t('period.This week'));
   assert.equal(zh('#calendar-date option').last().attr('value'), event.eventDate);
@@ -76,19 +79,34 @@ test('locale fallback and formatters keep the Las Vegas date across midnight', (
   assert.equal(getFreshnessStatus(null, { now, calendar: true }).key, 'unknown');
 });
 
-test('Chinese cards identify unfamiliar entry clauses and preserve the entire English source', () => {
+test('Chinese cards refer to the source when a condition cannot be translated in full', () => {
   const unfamiliar = 'Present a flyer with a <silver star>';
   const partial = `Girls and guys free. ${unfamiliar}`;
   const listingMenu = { ...menu, events: [{ ...event, details: partial }, { ...event, details: unfamiliar }] };
-  const zh = load(renderSite(listingMenu, { source: 'github_pages_snapshot' }, now, null, null, null, { locale: 'zh-CN' }));
-  const entries = zh('.entry');
-  assert.match(entries.first().find('p').first().text(), /免费/);
-  assert.equal(entries.first().find('span[lang="en"]').text(), unfamiliar);
-  assert.equal(entries.first().find('.entry-original p').text(), partial);
-  assert.equal(entries.last().find('p[lang="en"]').text(), unfamiliar);
-  assert.equal(entries.last().find('.entry-original').length, 0);
-  assert.equal(entries.find('.entry-translation-note').length, 2);
-  assert.ok(zh.html().includes('&lt;silver star&gt;'));
+  const html = renderSite(listingMenu, { source: 'github_pages_snapshot' }, now, null, null, null, { locale: 'zh-CN' });
+  const zh = load(html);
+  const expected = createTranslator('zh-CN')('card.entryCheckSource');
+  assert.deepEqual(zh('.entry p').map((_, entry) => zh(entry).text()).get(), [expected, expected]);
+  assert.equal(zh('.entry details, .entry button, .entry [lang="en"]').length, 0);
+  assert.ok(zh('.event-card').first().attr('data-search').includes(partial));
+  assert.ok(zh('.event-card').last().attr('data-search').includes(unfamiliar));
+  assert.ok(html.includes('&lt;silver star&gt;'));
+});
+
+test('Chinese cards localize recurring weekdays and source date warnings', () => {
+  const warning = 'Explicit event date is outside the advertised week-ending window';
+  const listingMenu = {
+    ...menu,
+    events: [
+      { ...event, dateWarnings: [warning] },
+      { ...event, eventDate: null, dateText: 'Thursday - Sunday' },
+    ],
+  };
+  const zh = load(renderSite(listingMenu, { source: 'github_pages_snapshot' }, now, null, null, calendar, { locale: 'zh-CN' }));
+  assert.match(zh('.event-date').first().text(), /活动的具体日期超出来源标注的周次/);
+  assert.doesNotMatch(zh('.event-date').first().text(), /Explicit event date/);
+  assert.match(zh('.event-date').last().text(), /周四至周日/);
+  assert.doesNotMatch(zh('.event-date').last().text(), /Thursday - Sunday/);
 });
 
 test('search accepts original text and bilingual labels independently of the selected UI language', () => {

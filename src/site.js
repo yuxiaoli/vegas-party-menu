@@ -6,6 +6,13 @@ import { createFormatters, createTranslator, DEFAULT_LOCALE, LOCALES } from './m
 import { getFreshnessStatus } from './freshness.js';
 import { localeBootstrapScript } from './locale-navigation.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+const DATE_WARNING_KEYS = new Map([
+  ['Unrecognized explicit date', 'card.warningUnrecognized'],
+  ['Missing verified source week', 'card.warningMissingWeek'],
+  ['Invalid or ambiguous date near source week', 'card.warningAmbiguousDate'],
+  ['Weekday does not match explicit calendar date', 'card.warningWeekdayMismatch'],
+  ['Explicit event date is outside the advertised week-ending window', 'card.warningOutsideWeek'],
+]);
 
 export function eventDays(dateText) {
   const text = String(dateText || '');
@@ -18,18 +25,22 @@ export function eventDays(dateText) {
 }
 
 function renderEntry(details, locale, t) {
-  if (!details) return `<p>${escape(t('card.entryUnknown'))}</p>`;
+  if (!details?.trim()) return `<p>${escape(t('card.entryUnknown'))}</p>`;
   if (locale !== 'zh-CN') return `<p>${escape(details)}</p>`;
 
   const { parts, complete } = translateEntryDetails(details);
-  const hasTranslation = parts.some(part => part.translated);
-  const note = complete ? '' : `<p class="entry-translation-note">${escape(t('card.entryPartial'))}</p>`;
-  if (!hasTranslation) {
-    return `<p lang="en">${escape(details)}</p>${note}`;
+  if (!complete) return `<p>${escape(t('card.entryCheckSource'))}</p>`;
+  return `<p>${parts.map(part => escape(part.text)).join('。')}。</p>`;
+}
+
+function sourceDateLabel(dateText, locale, t) {
+  if (!dateText) return t('card.dateUnknown');
+  if (locale !== 'zh-CN') return dateText;
+  const weekdays = dateText.split(/\s*-\s*/);
+  if (weekdays.length <= 2 && weekdays.every(day => DAYS.includes(day))) {
+    return weekdays.map(day => t(`dayShort.${day}`)).join('至');
   }
-  const translation = parts.map(part => part.translated ? escape(part.text) : `<span lang="en">${escape(part.text)}</span>`).join('。');
-  return `<p>${translation}。</p>${note}
-    <details class="entry-original"><summary>${escape(t('card.entryOriginal'))}</summary><p lang="en">${escape(details)}</p></details>`;
+  return dateText;
 }
 
 export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, venueCatalog = null, calendar = null, {
@@ -62,20 +73,23 @@ export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, v
     const kind = event.section === 'Dayclubs' ? 'day' : event.section === 'After Parties' ? 'late' : 'night';
     const weekly = !/\d{1,2}\/\d{1,2}/.test(event.dateText || '');
     const dated = calendar && event.eventDate;
-    const dateLabel = dated ? displayDate(event.eventDate) : event.dateText || t('card.dateUnknown');
+    const dateLabel = dated ? displayDate(event.eventDate) : sourceDateLabel(event.dateText, locale, t);
     const sourceWeek = localized && event.weekEnding ? format.date(event.weekEnding) : event.weekEnding;
     const sourceWeekLabel = calendar && !event.eventDate ? ` · ${tr('card.sourceWeek', { date: sourceWeek || t('card.sourceWeekUnknown') })}` : '';
     const provisional = calendar && event.provisional;
+    const dateWarnings = calendar && event.dateWarnings?.map(warning => {
+      const key = DATE_WARNING_KEYS.get(warning);
+      return key ? t(key) : warning;
+    }).join(localized ? '；' : '; ');
     return `<article class="event-card" data-category="${escape(event.section)}"${event.id ? ` data-event-id="${escape(event.id)}"` : ''}${calendar ? ` data-event-date="${escape(event.eventDate || '')}" data-week-ending="${escape(event.weekEnding || '')}"` : ''} data-days="${escape(eventDays(event.dateText).join(' '))}" data-search="${escape([event.venue, event.description, event.details, event.dateText].join(' '))}">
       <div class="card-top"><span class="kind kind-${kind}">${CATEGORIES.includes(event.section) ? tr(`category.${event.section}`) : escape(event.section)}</span><span class="event-number">${format.number(index + 1, { minimumIntegerDigits: 2, useGrouping: false })}</span></div>
       <p class="event-date">${dated ? `<time datetime="${escape(event.eventDate)}">${escape(dateLabel)}</time>` : escape(dateLabel)}
-        ${localized && dated && event.dateText ? `<span class="recurring">${tr('card.originalDate', { date: event.dateText })}</span>` : ''}
         ${weekly ? `<span class="recurring">${tr('card.recurring')}${sourceWeekLabel}</span>` : ''}
         ${calendar && !weekly && !event.eventDate ? `<span class="recurring">${tr('card.clarify')}</span>` : ''}
         ${provisional ? `<span class="advance-listing">${tr('card.advance')}</span>` : ''}
-        ${calendar && event.dateWarnings?.length ? `<span class="advance-listing">${tr('card.dateWarning', { warning: event.dateWarnings.join('; ') })} ${tr('card.sourceWeekLabel', { date: sourceWeek })}</span>` : ''}</p>
+        ${dateWarnings ? `<span class="advance-listing">${tr('card.dateWarning', { warning: dateWarnings })} ${tr('card.sourceWeekLabel', { date: sourceWeek })}</span>` : ''}</p>
       <h3>${renderArtistHeading(event.description, djCatalog, { t, format, locale })}</h3>
-      <p class="venue" data-venue="${escape(event.venue)}">${renderVenueName(event.venue, venueCatalog, { t, format })}</p>
+      <p class="venue" data-venue="${escape(event.venue)}">${renderVenueName(event.venue, venueCatalog, { t, locale })}</p>
       ${renderDJProfile(event.description, djCatalog, { t, format, locale })}
       <div class="entry"><span class="entry-label">${tr('card.entryLabel')}</span>${renderEntry(event.details, locale, t)}</div>
     </article>`;
@@ -224,9 +238,6 @@ footer{flex-wrap:wrap;row-gap:24px}.personal-credit{flex-basis:100%;margin:0;pad
 .site-header nav:not(.language-links){margin-left:auto}
 .site-header .language-links{flex-wrap:wrap;gap:8px;justify-content:flex-end}
 .site-header .language-links .locale-link{display:inline-block;white-space:nowrap;border:1px solid var(--line);padding:9px 10px}
-.entry-original{margin-top:9px;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
-.entry-original summary{width:fit-content;padding:5px 0;text-decoration:underline;text-underline-offset:3px}
-.entry .entry-translation-note{font-size:10px;color:var(--muted)}
 #filter-error{margin:12px 0 0;font-size:11px;line-height:1.6;color:#974512}
 :lang(zh-CN) h1,:lang(zh-CN) h1 span,:lang(zh-CN) h2{letter-spacing:normal}
 :lang(zh-CN) h1{font-size:clamp(52px,6vw,94px);line-height:1.1}
@@ -235,7 +246,6 @@ footer{flex-wrap:wrap;row-gap:24px}.personal-credit{flex-basis:100%;margin:0;pad
   .site-header{gap:10px}
   .site-header nav:not(.language-links){display:none}
   .site-header .language-links .locale-link{font-size:11px;padding:9px 7px}
-  .entry-original summary{padding:9px 0}
   :lang(zh-CN) h1{font-size:clamp(28px,8.5vw,51px)}
   :lang(zh-CN) .section-heading{flex-direction:column;gap:8px}
   :lang(zh-CN) .lineup-summary{padding-top:0;white-space:normal;text-align:left}

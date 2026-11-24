@@ -1,5 +1,5 @@
-import { CATALOG_URL } from './dj-catalog.js';
-import { createTranslator } from './messages.js';
+import { CATALOG_URL, catalogDetailUrl } from './djmag-links.js';
+import { createTranslator, DEFAULT_LOCALE } from './messages.js';
 
 export const VENUE_INDEX_URL = new URL('data/venues/index.json', CATALOG_URL).href;
 export const venueKey = value => String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US');
@@ -29,13 +29,15 @@ export function reviewedVenue(value) {
 }
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-export function renderVenueName(value, catalog, { t = defaultT } = {}) {
+export function renderVenueName(value, catalog, { t = defaultT, locale = DEFAULT_LOCALE } = {}) {
   const label = escape(value || t('card.venueUnknown'));
   const alias = reviewedVenue(value);
   if (!alias) return label;
   const matches = (catalog?.venues || []).filter(venue => venue.id === alias.id && venueKey(venue.name) === venueKey(alias.name) && venue.type === alias.type && venueKey(venue.location) === venueKey(alias.location));
-  const expectedUrl = new URL(`venues/${alias.id}.html`, CATALOG_URL).href;
-  if (matches.length !== 1 || matches[0].detailUrl !== expectedUrl) return label;
+  const canonicalUrl = catalogDetailUrl('venues', alias.id);
+  if (matches.length !== 1 || matches[0].detailUrl !== canonicalUrl) return label;
+  const href = catalogDetailUrl('venues', alias.id, locale);
+  if (locale === 'zh-CN' && matches[0].detailUrls?.[locale] !== href) return label;
   const detailsLabel = t('card.venueDetails', { venue: value });
-  return `<a class="venue-link" href="${expectedUrl}" target="_blank" rel="noopener noreferrer" aria-label="${escape(detailsLabel)}">${label}</a>`;
+  return `<a class="venue-link" href="${escape(href)}" target="_blank" rel="noopener noreferrer" aria-label="${escape(detailsLabel)}">${label}</a>`;
 }

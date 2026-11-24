@@ -44,6 +44,18 @@ test('translates the collected entry conditions without changing party qualifier
   const overnight = translateEntryDetails(sourceConditions[12]).parts.map(part => part.text).join('。');
   assert.match(overnight, /周三.*酒水券/);
   assert.match(overnight, /周四至周六 23:30–次日 00:30/);
+  assert.equal(
+    translateEntryDetails(sourceConditions[7]).parts[1].text,
+    '周六、周日，女士可享用免费酒水，供应至 00:30',
+  );
+  assert.equal(
+    translateEntryDetails(sourceConditions[17]).parts[1].text,
+    '宾客名单适用时间：18:00–次日 06:00（来源同时使用了“截至”的说法）',
+  );
+  assert.deepEqual(
+    translateEntryDetails(sourceConditions[21]).parts.map(part => part.text),
+    ['女士可免费入场', '男士的同行者中至少有一位女士，方可免费入场'],
+  );
 });
 
 test('translates newly encountered prices, age, ID, dress, list and opening conditions', () => {
@@ -53,7 +65,7 @@ test('translates newly encountered prices, age, ID, dress, list and opening cond
   assert.equal(complete, true);
   assert.deepEqual(parts.map(part => part.text), [
     '票价：$25.50（22:00 前）',
-    '仅限年满 21 岁者入场，须出示有效的政府签发的带照片的身份证件',
+    '仅限年满 21 岁者入场，须出示政府签发且带照片的有效身份证件',
     '着装要求：精致休闲装，禁止穿戴短裤，禁止穿戴帽子',
     '须登记宾客名单',
     '仅收现金',
@@ -63,6 +75,8 @@ test('translates newly encountered prices, age, ID, dress, list and opening cond
   assert.deepEqual(range.parts.map(part => part.text), ['宾客名单适用时间：周五 23:30–次日 00:30']);
   const address = translateEntryDetails('2245 E. Flamingo Rd. Doors open at 12 a.m.');
   assert.deepEqual(address.parts.map(part => part.text), ['地址：2245 E. Flamingo Rd', '开门时间：00:00']);
+  const cutoff = translateEntryDetails('Free admission before 10pm. Guest list closes at 1am.');
+  assert.deepEqual(cutoff.parts.map(part => part.text), ['22:00 前可免费入场', '宾客名单登记截止时间：01:00']);
 });
 
 test('unrecognized conditions remain visible without asserting partial eligibility', () => {
