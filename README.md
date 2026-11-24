@@ -24,7 +24,7 @@ The public page is branded **Vegas Parties**, including its title, sharing metad
 
 `npm run build:site` generates `site-dist/`: a responsive, source-backed menu, local JSON snapshot and RSS. The website contains no charts or chart-library dependencies and requires no Cloudflare resources, secrets or external CDN. The existing API/RSS service code and source collector are preserved.
 
-Party-type and weekday buttons, search, reset and shareable URL filters make the original listings easy to browse. Each card retains the original artist, venue, date wording and entry conditions; the original menu remains linked in the page navigation and fine print. Recurring entries are explicitly marked without assigning invented dates. The browser recalculates freshness using the current Las Vegas date. With JavaScript disabled, all published menu cards remain readable.
+Party-type and weekday buttons, search, reset and shareable URL filters make the original listings easy to browse. Each card retains the original artist, venue, date wording and entry conditions. The fine print links to the original menu. Recurring entries are explicitly marked without assigning invented dates. The browser recalculates freshness using the current Las Vegas date. With JavaScript disabled, all published menu cards remain readable.
 
 `Deploy menu website` publishes after a relevant main-branch push or successful `Weekly menu sync`, and supports manual deployment without another crawl. The existing Monday 18:17 UTC cron is unchanged; there is no additional schedule. The workflow_run trigger handles successful snapshot commits made by GITHUB_TOKEN. Failed collection retains the last successful snapshot and published menu.
 
@@ -38,6 +38,8 @@ Matching is case/spacing-insensitive and removes only a trailing explicit arriva
 
 The menu remains complete if the optional catalog is unavailable; unmatched entries remain unchanged. A failed or mismatched artist record is omitted rather than showing stale or invented details. Existing source JSON, API/RSS and Monday 18:17 UTC collection remain unchanged.
 
+Artist headings and profile buttons pass the page language to the DJ catalog using its published `lang` parameter. Ranking links go to the original DJ Mag source. The venue catalog currently publishes English detail pages.
+
 Repository and GitHub Pages name: `vegas-party-menu`. Previous GitHub repository URLs redirect, but GitHub does not guarantee redirects for the former Pages site path. Legacy Cloudflare API/RSS URLs and collector configuration are unchanged.
 
 The root home URL defaults to This week. All dates shows every retained current/future-week event, matched or unmatched. Shared URLs with `q`, `day` or `type` parameters intentionally apply the existing search filters; use the root site URL when sharing the complete menu.
@@ -47,6 +49,8 @@ The root home URL defaults to This week. All dates shows every retained current/
 The English menu starts at `/vegas-party-menu/`. The language switch opens Simplified Chinese at `/vegas-party-menu/zh-CN/` and remembers the choice in this browser. The switch preserves search, filters, and the current section. Share the Chinese URL to open Chinese directly, or use `?lang=en` on the root URL to explicitly share English. Reset clears the filters and keeps the current language.
 
 The build renders a static page for each locale from `src/messages.js`, sharing one browser script, the same source snapshots, and the same filter values. To add a language, register its code, native display name, and message catalog in that module. Missing messages fall back to English. Dates and times display in `America/Los_Angeles` and use the selected locale's formatting. Original artist names, venues, entry conditions, and source links remain on both pages. Search matches original event text and English/Chinese party-type and weekday labels in either language.
+
+The Chinese cards translate entry conditions during rendering. The rules in `src/entry-translation.js` cover the published menu's wording and common price, time, age, dress and guest list conditions. Readers can expand the original English beneath a translation. When new wording falls outside the verified rules, the card shows that clause in English with a Chinese notice. The source snapshot and entry search text retain the original wording.
 
 ## Venue detail links
 

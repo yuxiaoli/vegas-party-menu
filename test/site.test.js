@@ -72,7 +72,8 @@ test('Vegas Parties branding replaces the source name throughout the page', () =
   }
   assert.equal($('meta[property="og:title"]').attr('content'), $('title').text());
   assert.equal($('link[rel="alternate"]').attr('href'), '/rss.xml');
-  assert.equal($('.nav-source').attr('href'), menu.sourceUrl);
+  assert.equal($('.site-header a').filter((_, link) => $(link).attr('href') === menu.sourceUrl).length, 0);
+  assert.equal($('.before-intro > a').attr('href'), menu.sourceUrl);
   assert.equal($('.source-link').length, 0);
   assert.doesNotMatch($('.event-card').text(), /Check original menu/);
   assert.equal($('.event-card').length, menu.events.length);

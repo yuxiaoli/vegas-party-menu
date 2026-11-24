@@ -43,14 +43,18 @@ test('Pages renders both languages with the same source records, filter IDs, and
   assert.equal(zh('script[type="module"]').attr('src'), '../assets/menu.js');
   assert.equal(zh('link[type="application/rss+xml"]').attr('href'), '../rss.xml');
   assert.equal(zh('a[href="../data/calendar.json"]').length, 1);
-  assert.equal(zh('.nav-source').attr('href'), menu.sourceUrl);
+  assert.equal(zh('.site-header a').filter((_, link) => zh(link).attr('href') === menu.sourceUrl).length, 0);
+  assert.equal(zh('.before-intro > a').attr('href'), menu.sourceUrl);
   assert.equal(zh('.event-card').attr('data-event-id'), event.id);
   assert.equal(zh('.event-card').attr('data-category'), event.section);
   assert.equal(zh('.kind').text(), t('category.Nightclubs'));
   assert.equal(zh('.event-card h3').text(), event.description);
   assert.equal(zh('.venue').text(), event.venue);
-  assert.equal(zh('.entry p').text(), event.details);
-  assert.equal(zh('.entry p').attr('lang'), 'en');
+  assert.equal(en('.entry > p').text(), event.details);
+  assert.match(zh('.entry > p').first().text(), /免费/);
+  assert.match(zh('.entry > p').first().text(), /提早|提前|早到/);
+  assert.equal(zh('.entry-original summary').text(), t('card.entryOriginal'));
+  assert.equal(zh('.entry-original p[lang="en"]').text(), event.details);
   assert.equal(zh('.event-date time').attr('datetime'), event.eventDate);
   assert.match(zh('.event-date time').text(), /2026年11月15日/);
   assert.ok(zh('.event-date').text().includes(event.dateText));
@@ -70,6 +74,21 @@ test('locale fallback and formatters keep the Las Vegas date across midnight', (
   assert.equal(getFreshnessStatus(menu.weekEnding, { now, calendar: true }).key, 'current');
   assert.equal(getFreshnessStatus(menu.weekEnding, { now: midnight, calendar: true }).key, 'older');
   assert.equal(getFreshnessStatus(null, { now, calendar: true }).key, 'unknown');
+});
+
+test('Chinese cards identify unfamiliar entry clauses and preserve the entire English source', () => {
+  const unfamiliar = 'Present a flyer with a <silver star>';
+  const partial = `Girls and guys free. ${unfamiliar}`;
+  const listingMenu = { ...menu, events: [{ ...event, details: partial }, { ...event, details: unfamiliar }] };
+  const zh = load(renderSite(listingMenu, { source: 'github_pages_snapshot' }, now, null, null, null, { locale: 'zh-CN' }));
+  const entries = zh('.entry');
+  assert.match(entries.first().find('p').first().text(), /免费/);
+  assert.equal(entries.first().find('span[lang="en"]').text(), unfamiliar);
+  assert.equal(entries.first().find('.entry-original p').text(), partial);
+  assert.equal(entries.last().find('p[lang="en"]').text(), unfamiliar);
+  assert.equal(entries.last().find('.entry-original').length, 0);
+  assert.equal(entries.find('.entry-translation-note').length, 2);
+  assert.ok(zh.html().includes('&lt;silver star&gt;'));
 });
 
 test('search accepts original text and bilingual labels independently of the selected UI language', () => {
