@@ -215,8 +215,10 @@ footer{flex-wrap:wrap;row-gap:24px}.personal-credit{flex-basis:100%;margin:0;pad
 :lang(zh-CN) h1 span{font-style:normal}
 @media(max-width:700px){
   .site-header{gap:10px}
+  .site-header .nav-source{white-space:nowrap}
   .site-header .language-links .locale-link{font-size:11px;padding:9px 7px}
   :lang(zh-CN) h1{font-size:clamp(28px,8.5vw,51px)}
-  :lang(zh-CN) .lineup-summary{white-space:normal;text-align:right}
+  :lang(zh-CN) .section-heading{flex-direction:column;gap:8px}
+  :lang(zh-CN) .lineup-summary{padding-top:0;white-space:normal;text-align:left}
 }
 `;
