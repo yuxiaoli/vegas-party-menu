@@ -100,3 +100,26 @@ test('calendar month layout starts on Monday and handles leap years', async () =
  assert.equal(monthDays('2028-02').days.at(-1), '2028-02-29');
  assert.equal(monthDays('2026-12').days.length, 31);
 });
+
+test('both localized public pages omit operations, preserve useful event info and link Expo Calendar', () => {
+ const event = {...menu.events[0], eventDate:'2026-11-21', weekEnding:'2026-11-22'};
+ const calendar = {menus:Array(9).fill({}), fetchedAt:'2026-09-05T16:37:00Z',events:[event]};
+ for (const locale of ['en', 'zh-CN']) {
+  const $ = load(renderSite({...menu,weekEnding:'2026-11-22',fetchedAt:'2026-09-06T16:37:00Z',events:[event]}, {source:'github_pages_snapshot'}, now, null, null, calendar, {locale,clientBundle:'void 0;',siteRoot:'./'}));
+  const visible = $('body').clone(); visible.find('script, style, [hidden]').remove();
+  assert.doesNotMatch(visible.text(), /\bcollected\b|scann(?:ed|ing)|source checked|采集|抓取|扫描|原文核对日期/i);
+  assert.equal($('#ad-placement[hidden]').text(), '');
+  assert.equal($('.menu-status').length, 0);
+  assert.equal($('.visitor-menu-notice[hidden]').length, 1);
+  assert.equal($('.event-card time').attr('datetime'), event.eventDate);
+  assert.match($('.calendar-coverage').text(), locale === 'en' ? /Las Vegas time/ : /拉斯维加斯时间/);
+  assert.equal($('footer .footer-related h2').text(), locale === 'en' ? 'Related projects' : '相关项目');
+  assert.equal($('footer .footer-related a').attr('href'), 'https://expo-calendar.cf-io.workers.dev/?lang=' + locale);
+ }
+});
+
+test('public menu still warns visitors when the published week has ended', () => {
+ const $ = load(renderSite({...menu,weekEnding:'2026-11-08'}, {source:'github_pages_snapshot'}, now, null, null, {menus:[{}]}, {clientBundle:'void 0;'}));
+ assert.equal($('.visitor-menu-notice').attr('hidden'), undefined);
+ assert.match($('.visitor-menu-notice').text(), /This menu week has ended/);
+});
