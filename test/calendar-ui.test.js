@@ -47,7 +47,7 @@ test('calendar rendering keeps original cards, date choices, source notice and e
  const snapshot={schemaVersion:1,timeZone:'America/Los_Angeles',fetchedAt:'2026-11-15T23:00:00Z',menus:[{},{}],events:[event,recurring],warnings:[]};
  const $=load(renderSite({...menu,events:snapshot.events},{source:'github'},now,null,null,snapshot));
  assert.equal($('.event-card').length,2);assert.equal($('#filters[data-calendar]').length,1);
- assert.deepEqual($('[data-period]').map((_,e)=>$(e).text()).get(),['This week','Next week','Upcoming','All dates']);assert.equal($('[data-period][aria-pressed=true]').attr('data-period'),'This week');assert.equal($('#calendar-date option[value="2027-01-03"]').length,1);
+ assert.deepEqual($('[data-period]').map((_,e)=>$(e).text()).get(),['This week','Next week','Upcoming','All dates']);assert.equal($('[data-period][aria-pressed=true]').attr('data-period'),'This week');assert.equal($('button#calendar-date').length,1);
  assert.match($('.event-date').first().text(),/Jan 3, 2027/);assert.match($('.event-date').first().text(),/Source week label: 2027-01-02/);
  assert.match($('.recurring').text(),/source week ending 2027-01-02/);
  assert.match($('.calendar-coverage').text(),/provisional/);assert.equal($('.source-notes #dress-code').length,1);
@@ -90,5 +90,13 @@ test('static rendering excludes retired cards and date options without mutating 
  const snapshot={menus:[{},{}],events:[old,future],fetchedAt:now.toISOString()};
  const $=load(renderSite({...menu,events:snapshot.events},{source:'github'},new Date('2026-11-16T08:00Z'),null,null,snapshot));
  assert.equal($('.event-card').length,1);assert.equal($('.event-card').attr('data-event-date'),'2026-11-19');
- assert.equal($('#calendar-date option[value="2026-11-14"]').length,0);assert.equal(snapshot.events.length,2);
+ assert.equal($('.event-card[data-event-date="2026-11-14"]').length,0);assert.equal(snapshot.events.length,2);
+});
+
+
+test('calendar month layout starts on Monday and handles leap years', async () => {
+ const { monthDays } = await import('../src/date-picker.js');
+ assert.equal(monthDays('2027-02').offset, 0);
+ assert.equal(monthDays('2028-02').days.at(-1), '2028-02-29');
+ assert.equal(monthDays('2026-12').days.length, 31);
 });

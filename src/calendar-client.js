@@ -2,10 +2,12 @@ import {
   calendarSearchParams, defaultCalendarState, DEFAULT_PERIOD, filterCalendar, filterMenu,
   globalSearchState, isRetainedEvent, lasVegasDate, PERIODS, periodFromParams, weekRange
 } from './calendar-filters.js';
+import { initDatePicker } from './date-picker.js';
 
 const filterParams = ['q', 'type', 'day', 'period', 'date'];
 
-export function initCalendar(t, { number }, syncLocaleLinks) {
+export function initCalendar(t, format, syncLocaleLinks) {
+  const { number } = format;
   const filters = document.querySelector('#filters');
   if (!filters) return;
 
@@ -19,7 +21,13 @@ export function initCalendar(t, { number }, syncLocaleLinks) {
     venue: card.querySelector('.venue').dataset.venue
   }));
   const search = document.querySelector('#search');
-  const date = document.querySelector('#calendar-date');
+  const pickerElement = document.querySelector('#calendar-picker');
+  const date = pickerElement && initDatePicker(pickerElement, t, format, value => {
+    state.date = value;
+    state.period = 'All';
+    applyFilters();
+  });
+  const availableDates = () => new Set(records.map(record => record.eventDate).filter(Boolean));
   const categoryButtons = [...filters.querySelectorAll('[data-category-filter]')];
   const dayButtons = [...filters.querySelectorAll('[data-day]')];
   const periodButtons = [...filters.querySelectorAll('[data-period]')];
@@ -42,7 +50,8 @@ export function initCalendar(t, { number }, syncLocaleLinks) {
     const category = categoryButtons.find(button => button.dataset.categoryFilter === params.get('type'));
     const day = dayButtons.find(button => button.dataset.day === params.get('day'));
     const validPeriod = date && PERIODS.includes(params.get('period'));
-    const selectedDate = date && [...date.options].find(option => option.value && option.value === params.get('date'));
+    const requestedDate = params.get('date');
+    const selectedDate = date && availableDates().has(requestedDate) ? requestedDate : '';
     showInvalidFilter(
       (params.has('type') && !category) || (params.has('day') && !day)
       || (params.has('period') && !validPeriod) || (params.has('date') && !selectedDate)
@@ -53,7 +62,7 @@ export function initCalendar(t, { number }, syncLocaleLinks) {
       category: category?.dataset.categoryFilter || 'All',
       day: day?.dataset.day || 'All',
       period: date ? periodFromParams(params) : DEFAULT_PERIOD,
-      date: selectedDate?.value || ''
+      date: selectedDate
     };
   }
 
@@ -69,9 +78,6 @@ export function initCalendar(t, { number }, syncLocaleLinks) {
         record.card.remove();
         return false;
       });
-      for (const option of [...date.options]) {
-        if (option.value && option.value < cutoff) option.remove();
-      }
       if (state.date && state.date < cutoff) {
         state.date = '';
         state.period = DEFAULT_PERIOD;
@@ -86,7 +92,7 @@ export function initCalendar(t, { number }, syncLocaleLinks) {
       listingTotal.textContent = number(records.length);
       const venues = new Set(records.map(record => record.venue).filter(Boolean));
       venueTotal.textContent = number(venues.size);
-      date.value = state.date;
+      date.sync(availableDates(), state.date);
       for (const button of periodButtons) {
         button.setAttribute('aria-pressed', String(!state.date && button.dataset.period === state.period));
       }
@@ -163,11 +169,6 @@ export function initCalendar(t, { number }, syncLocaleLinks) {
       applyFilters();
     });
   }
-  date?.addEventListener('change', () => {
-    state.date = date.value;
-    state.period = 'All';
-    applyFilters();
-  });
   function reset() {
     state = defaultCalendarState();
     applyFilters();
