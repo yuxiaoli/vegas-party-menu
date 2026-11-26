@@ -63,7 +63,7 @@ test('Pages renders both languages with the same source records, filter IDs, and
   assert.ok(zh('.event-card').attr('data-search').includes(event.dateText));
   assert.equal(zh('[data-day="Sunday"]').attr('aria-label'), t('day.Sunday'));
   assert.equal(zh('[data-period="This week"]').text(), t('period.This week'));
-  assert.equal(zh('#calendar-date option').last().attr('value'), event.eventDate);
+  assert.equal(zh('button#calendar-date').text(), '选择日期');
   assert.equal(zh('#filter-error').text(), t('filter.invalid'));
 });
 
