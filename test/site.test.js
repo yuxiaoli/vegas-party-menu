@@ -12,7 +12,7 @@ test('home renders every source event, source link and existing API links', () =
   assert.equal((html.match(/<article class="event-card"/g) || []).length, menu.events.length);
   for (const path of ['/api/menu', '/rss.xml', '/openapi.json']) assert.ok(html.includes(`href="${path}"`));
   assert.ok(html.includes(menu.sourceUrl));
-  assert.match(html, /Current menu week/);
+  assert.equal(load(html)('.visitor-menu-notice[hidden]').length, 1);
   assert.match(html, /Not affiliated with the original publisher or venues/);
 });
 
@@ -32,10 +32,9 @@ test('home clearly labels recurring entries without specific dates', () => {
 });
 
 test('home explicitly reports fallback, outdated and unknown menu weeks', () => {
-  assert.match(renderSite(menu, { source: 'bundled_fallback', remoteRead: 'failed' }, now), /Backup snapshot/);
-  assert.match(renderSite({ ...menu, weekEnding: '2026-11-08' }, current, now), /Past menu week/);
-  assert.match(renderSite({ ...menu, weekEnding: null }, current, now), /Menu date unknown/);
-  assert.match(renderSite({ ...menu, weekEnding: null }, current, now), /Collection time does not establish event dates/);
+  assert.match(renderSite(menu, { source: 'bundled_fallback', remoteRead: 'failed' }, now), /Listings may be out of date/);
+  assert.match(renderSite({ ...menu, weekEnding: '2026-11-08' }, current, now), /This menu week has ended/);
+  assert.match(renderSite({ ...menu, weekEnding: null }, current, now), /Event dates are not confirmed/);
 });
 
 test('home escapes source strings in text and HTML attributes', () => {
@@ -97,7 +96,7 @@ test('dress code is an attributed concise guide, not invented venue rules or mod
   assert.deepEqual($('.source-details > details > summary').map((_,e)=>$(e).text().replace(/\s*\+$/, '').trim()).get(), ['LINKS','STRIP CLUB DEALS','UPCOMING EVENTS','DRESS CODE']);
   assert.equal(section.find('.dress-source').attr('href'), 'https://halfsaintvegas.com/pages/vegas-dress-code');
   assert.match(section.text(), /Half Saint/);assert.match(section.text(), /venue-specific requirements/);
-  assert.match(section.text(), /essential medication/);assert.match(section.text(), /Source checked November 15, 2026/);
+  assert.match(section.text(), /essential medication/);assert.doesNotMatch(section.text(), /Source checked/);
   assert.ok(section.text().split(/\s+/).length <= 200);
   assert.equal($('.event-card').length, menu.events.length);
   $('.event-card').each((i, card) => assert.equal($(card).find('.entry p').text(), menu.events[i].details));

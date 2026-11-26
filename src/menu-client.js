@@ -29,4 +29,17 @@ if (status) {
   setInterval(updateFreshness, 60000);
 }
 
+const notice = document.querySelector('.visitor-menu-notice');
+if (notice) {
+  const calendar = Boolean(document.querySelector('#filters[data-calendar]'));
+  const fallback = notice.hasAttribute('data-fallback');
+  function updateVisitorNotice() {
+    const { key, warning } = getFreshnessStatus(notice.dataset.weekEnding, { calendar, fallback });
+    notice.hidden = !warning;
+    notice.textContent = warning ? t(`freshnessExplanation.${key}`) : '';
+  }
+  updateVisitorNotice();
+  setInterval(updateVisitorNotice, 60000);
+}
+
 initCalendar(t, format, syncLocaleLinks);
