@@ -113,7 +113,8 @@ test('both localized public pages omit operations, preserve useful event info an
   assert.equal($('.visitor-menu-notice[hidden]').length, 1);
   assert.equal($('.event-card time').attr('datetime'), event.eventDate);
   assert.match($('.calendar-coverage').text(), locale === 'en' ? /Las Vegas time/ : /拉斯维加斯时间/);
-  assert.equal($('footer .footer-related h2').text(), locale === 'en' ? 'Related projects' : '相关项目');
+  assert.equal($('footer .footer-related h2').text(), locale === 'en' ? 'Affiliated Projects' : '关联项目');
+  assert.equal($('footer .footer-related a').attr('hreflang'), locale);
   assert.equal($('footer .footer-related a').attr('href'), 'https://expo-calendar.cf-io.workers.dev/?lang=' + locale);
  }
 });
