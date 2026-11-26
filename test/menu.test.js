@@ -12,5 +12,5 @@ test('menu website has no chart dependency or chart bootstrap',()=>{
  assert.equal(pkg.dependencies['chart.js'],undefined);
  const build=readFileSync(new URL('../scripts/build-site.mjs',import.meta.url),'utf8');
  assert.ok(!build.includes('canvas'));assert.ok(!build.includes('charts.js'));
- assert.ok(build.includes('./assets/menu.js'));
+ assert.ok(build.includes('clientBundle: bundle.text'));
 });
