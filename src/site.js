@@ -59,12 +59,11 @@ export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, v
     return `<a class="locale-link" href="${escape(href)}" data-locale-link="${code}" lang="${code}" hreflang="${code}">${escape(label)}</a>`;
   }).join('');
   const weekEnding = Number.isFinite(Date.parse(`${menu.weekEnding}T12:00:00Z`)) ? menu.weekEnding : '';
-  const weekLabel = weekEnding ? format.date(weekEnding) : t('freshness.unknownWeek');
   const ticketDate = weekEnding ? format.date(weekEnding, { month: 'short', day: 'numeric' }).toUpperCase() : t('ticket.unknown');
   const ticketYear = weekEnding ? format.date(weekEnding, { year: 'numeric' }) : t('ticket.unknownYear');
   const fallback = snapshot.source === 'bundled_fallback';
   const status = getFreshnessStatus(weekEnding, { now, calendar: isPages && Boolean(calendar), fallback, pages: isPages });
-  const captured = format.timestamp(menu.fetchedAt, { dateStyle: 'medium', timeStyle: 'short' });
+  const expoUrl = localized ? 'https://expo-calendar.cf-io.workers.dev/?lang=zh-CN' : 'https://expo-calendar.cf-io.workers.dev/?lang=en';
   const events = calendar ? menu.events.filter(event => isRetainedEvent(event, now)) : menu.events;
   const venues = new Set(events.map(event => event.venue).filter(Boolean)).size;
   const dates = calendar ? [...new Set(events.map(event => event.eventDate).filter(Boolean))].sort() : [];
@@ -111,9 +110,8 @@ export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, v
     </div>
     <p id="date-filter-note" class="date-filter-note">${tr('filter.initialNote')}</p>` : '';
   const calendarCoverage = calendar ? `
-    <aside class="calendar-coverage"><strong>${tr('coverage.menus', { count: format.number(calendar.menus.length) })}</strong>
-      <span>${dates.length ? tr('coverage.through', { date: displayDate(dates.at(-1)) }) : tr('coverage.unavailable')} · ${tr('coverage.timeZone')}</span>
-      <p>${tr('coverage.captured', { date: format.timestamp(calendar.fetchedAt, { dateStyle: 'medium' }) })} ${tr('coverage.notice')}
+    <aside class="calendar-coverage"><span>${dates.length ? tr('coverage.through', { date: displayDate(dates.at(-1)) }) : tr('coverage.unavailable')} · ${tr('coverage.timeZone')}</span>
+      <p>${tr('coverage.notice')}
         <a href="https://halfsaintvegas.com/pages/upcoming-events" target="_blank" rel="noopener noreferrer">${tr('coverage.source')}</a> · <a href="${escape(siteRoot)}data/calendar.json">${tr('coverage.data')}</a>
       </p>
     </aside>` : '';
@@ -155,13 +153,11 @@ ${isPages && !localized ? `<script>${localeBootstrapScript}</script>` : ''}
   </aside>
 </section>
 <div class="ticker" aria-hidden="true"><span>${tr('ticker.daylight')}</span><span>✳</span><span>${tr('ticker.frequency')}</span><span>✳</span><span>${tr('ticker.happens')}</span><span>✳</span></div>
-<section class="menu-status${status.warning ? ' status-warning' : ''}" aria-label="${tr('freshness.label')}" data-week-ending="${escape(weekEnding)}"${fallback ? ' data-fallback' : ''}>
-  <div><span class="status-dot"></span><strong>${tr(`freshness.${status.key}`)}</strong><span class="status-divider">/</span><span>${tr('freshness.weekEnding', { date: weekLabel })}</span></div>
-  <p>${tr('freshness.captured', { date: captured })}</p>
-  <p class="status-explanation">${tr(`freshnessExplanation.${status.key}`)}</p>
-</section>
+<!-- Reserved placement. No advertising or visible placeholder is rendered. -->
+<div id="ad-placement" hidden></div>
 ${calendarCoverage}
 <section class="lineup-section" id="lineup" aria-labelledby="lineup-heading">
+  <p class="visitor-menu-notice" data-week-ending="${escape(weekEnding)}"${fallback ? ' data-fallback' : ''}${status.warning ? '' : ' hidden'}>${status.warning ? tr(`freshnessExplanation.${status.key}`) : ''}</p>
   <div class="section-heading">
     <div><p class="eyebrow">${tr('lineup.eyebrow')}</p><h2 id="lineup-heading">${tr('lineup.titleFirst')} <em>${tr('lineup.titleSecond')}</em></h2></div>
     <p class="lineup-summary"><strong>${format.number(events.length)}</strong> ${tr('lineup.listings')} <span>/</span> <strong>${format.number(venues)}</strong> ${tr('lineup.venues')}<br><span class="small-note">${tr('lineup.note')}</span></p>
@@ -207,7 +203,7 @@ ${calendarCoverage}
           <div><h3>${tr('dress.packTitle')}</h3><p>${tr('dress.packText')}</p></div>
         </div>
         <a class="dress-source" href="https://halfsaintvegas.com/pages/vegas-dress-code" target="_blank" rel="noopener noreferrer">${tr('dress.source')}</a>
-        <p class="dress-observed">${tr('dress.observed', { date: format.date('2026-11-15', { month: 'long', day: 'numeric', year: 'numeric' }) })}</p>
+        <p class="dress-observed">${tr('dress.policyNote')}</p>
       </div>
     </details>
   </div>
@@ -221,6 +217,10 @@ ${calendarCoverage}
     ${isPages ? '' : `<a href="/openapi.json">${tr('footer.apiDocs')}</a>`}
     <a href="https://github.com/yuxiaoli/vegas-party-menu" target="_blank" rel="noopener noreferrer">${tr('footer.source')}</a>
   </div>
+  <nav class="footer-related" aria-labelledby="footer-related-title">
+    <h2 id="footer-related-title">${tr('footer.related')}</h2>
+    <a href="${escape(expoUrl)}">${tr('footer.expoCalendar')} <span aria-hidden="true">↗</span></a>
+  </nav>
   <p class="footer-signoff">${tr('footer.signoffFirst')}<br>${tr('footer.signoffSecond')}</p>
   <p class="personal-credit" lang="en">Built by <a href="https://s.vectorindex.cloud/sean" target="_blank" rel="noopener noreferrer">Sean</a> with ❤️</p>
 </footer>
@@ -238,7 +238,7 @@ const STYLES = `
 @media(max-width:700px){.event-grid{grid-template-columns:1fr;gap:15px}.event-card{padding:22px 22px 19px}.kind{font-size:8px;padding:7px 9px;letter-spacing:.9px}.event-number{font-size:10px}.event-date{font-size:11px;line-height:1.5}.recurring{font-size:10px}.event-card h3{font-size:29px;letter-spacing:-.9px;overflow-wrap:normal}.venue{font-size:10px;letter-spacing:.4px;margin-bottom:22px}.entry{padding:17px 0}.entry-label{font-size:8px}.entry p{font-size:13px;line-height:1.75}.source-link{font-size:11px;padding-top:15px;min-height:35px;align-items:center}.source-link span{font-size:17px}.category-tabs button{min-height:44px}.day-tabs button{min-height:36px}.search-box{min-height:42px}}
 @media(max-width:380px){.hero{grid-template-columns:minmax(0,1fr) 118px;gap:9px}h1{font-size:37px;letter-spacing:-2.4px}h1 span{letter-spacing:-2.1px}.ticket-date strong{font-size:23px}.ticket-symbol{font-size:54px}.ticket-top{font-size:6px}.ticket-bottom>span{display:none}.ticket-bottom{justify-content:center}.brand-mark{font-size:26px}.wordmark{font-size:18px}.event-grid{grid-template-columns:1fr}.event-card h3{font-size:27px}.entry p{font-size:13px}.event-date,.venue,.source-link{font-size:11px}.kind{font-size:8px}.day-tabs button{padding:7px 6px}}
 @media(max-width:700px){.category-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}.category-tabs button{text-align:left;padding:12px 14px}}
-footer{flex-wrap:wrap;row-gap:24px}.personal-credit{flex-basis:100%;margin:0;padding:18px 0 0;border-top:1px solid var(--line);text-align:left;color:var(--muted);font-size:11px;line-height:1.6}.personal-credit a{text-underline-offset:4px}.dj-profile{margin:0 0 20px;background:#eeeaf7;padding:14px;border:1px solid #d8d1e5;text-align:left}.artist-link{text-decoration:none}.artist-link:hover{text-decoration:underline;text-underline-offset:5px}.artist-link:focus-visible,.dj-details:focus-visible{outline:2px solid currentColor;outline-offset:4px}.dj-details{display:inline-block;font-size:11px;font-weight:700;line-height:1.6;margin-top:12px;text-underline-offset:3px}.dj-rank{font-size:10px;text-decoration:none;display:flex;width:fit-content;gap:9px;align-items:center;white-space:nowrap}.dj-rank strong{font-size:20px;letter-spacing:-.5px}.dj-from,.dj-known{font-size:12px;line-height:1.65;margin:10px 0 0;text-align:left;overflow-wrap:anywhere}@media(max-width:700px){.dj-profile{padding:16px}.dj-details{font-size:12px}.dj-rank{font-size:11px}}
+footer{flex-wrap:wrap;row-gap:24px}.footer-related h2{font-size:10px;letter-spacing:.07em;margin:5px 0 8px;color:var(--muted)}.footer-related a{font-size:11px;font-weight:700;text-underline-offset:4px}.visitor-menu-notice{margin:0 0 20px;color:#794013;font-size:12px;line-height:1.6}.personal-credit{flex-basis:100%;margin:0;padding:18px 0 0;border-top:1px solid var(--line);text-align:left;color:var(--muted);font-size:11px;line-height:1.6}.personal-credit a{text-underline-offset:4px}.dj-profile{margin:0 0 20px;background:#eeeaf7;padding:14px;border:1px solid #d8d1e5;text-align:left}.artist-link{text-decoration:none}.artist-link:hover{text-decoration:underline;text-underline-offset:5px}.artist-link:focus-visible,.dj-details:focus-visible{outline:2px solid currentColor;outline-offset:4px}.dj-details{display:inline-block;font-size:11px;font-weight:700;line-height:1.6;margin-top:12px;text-underline-offset:3px}.dj-rank{font-size:10px;text-decoration:none;display:flex;width:fit-content;gap:9px;align-items:center;white-space:nowrap}.dj-rank strong{font-size:20px;letter-spacing:-.5px}.dj-from,.dj-known{font-size:12px;line-height:1.65;margin:10px 0 0;text-align:left;overflow-wrap:anywhere}@media(max-width:700px){.dj-profile{padding:16px}.dj-details{font-size:12px}.dj-rank{font-size:11px}}
 
 .dress-items h3{font-size:12px;margin:18px 0 7px}.dress-items p{margin:0}.dress-items strong{color:var(--ink)}.dress-source{display:inline-block;font-size:11px;font-weight:700;text-underline-offset:4px;margin-top:20px}.dress-code .dress-observed{font-size:10px;margin-bottom:0}@media(max-width:700px){.dress-code p{font-size:12px;line-height:1.8}.dress-items h3{font-size:13px}.dress-source{font-size:12px;line-height:1.8}}
 .calendar-coverage{max-width:1332px;margin:0 5%;padding:18px 0;border-bottom:1px solid var(--line);font-size:11px;line-height:1.7;color:var(--muted)}.calendar-coverage>strong{color:var(--ink);margin-right:18px}.calendar-coverage p{margin:6px 0 0}.calendar-coverage a{text-underline-offset:3px}.calendar-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin-top:20px}.period-tabs{display:flex;flex-wrap:wrap;gap:5px}.period-tabs button{border:1px solid var(--line);background:transparent;padding:9px 13px;font-size:11px}.period-tabs button[aria-pressed=true]{background:var(--acid);border-color:var(--ink)}.date-choice{position:relative;display:flex;align-items:center;gap:10px;font-size:10px;color:var(--muted)}.date-choice button{background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:9px;font:inherit}.date-choice #calendar-date{font-size:12px;min-height:42px}.calendar-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:5;width:min(20rem,90vw);padding:8px;background:var(--paper);color:var(--ink);border:1px solid var(--ink);box-shadow:3px 3px var(--line)}.calendar-panel[hidden]{display:none}.calendar-month-row{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;text-align:center;gap:4px;font-size:13px;margin-bottom:6px}.calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center}.calendar-days button,.calendar-month-row button{min-height:38px;padding:2px;font-size:13px}.calendar-days button[aria-pressed=true]{background:var(--acid);border-color:var(--ink)}.calendar-days button[aria-current=date]{font-weight:700}.date-choice button:disabled{opacity:.45;cursor:default}.calendar-weekday{padding:4px 0}#calendar-clear-date{margin-top:7px;padding:8px;min-height:38px;font-size:12px}.date-filter-note{font-size:10px;color:var(--muted);line-height:1.6;margin:12px 0 0}.advance-listing{font-size:9px;font-weight:400;color:#696254;line-height:1.5;width:100%}@media(max-width:700px){.calendar-row{gap:12px}.period-tabs{width:100%;display:grid;grid-template-columns:repeat(2,1fr)}.period-tabs button{min-height:42px;padding:10px;text-align:left}.date-choice{width:100%;justify-content:space-between}.calendar-coverage>strong,.calendar-coverage>span{display:block}.advance-listing{font-size:10px}}
