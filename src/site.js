@@ -44,13 +44,13 @@ function sourceDateLabel(dateText, locale, t) {
 }
 
 export function renderSite(menu, snapshot, now = new Date(), djCatalog = null, venueCatalog = null, calendar = null, {
-  locale = DEFAULT_LOCALE, siteRoot = '/', clientScript = ''
+  locale = DEFAULT_LOCALE, siteRoot = '/', clientScript = '', clientBundle = ''
 } = {}) {
   const t = createTranslator(locale);
   const format = createFormatters(locale);
   const tr = (key, values) => escape(t(key, values));
   const localized = locale !== DEFAULT_LOCALE;
-  const isPages = Boolean(clientScript);
+  const isPages = Boolean(clientScript || clientBundle);
   const homeUrl = isPages ? './' : '/';
   const rssUrl = `${siteRoot}rss.xml`;
   const dataUrl = isPages ? `${siteRoot}data/menu.json` : '/api/menu';
@@ -224,7 +224,8 @@ ${calendarCoverage}
   <p class="footer-signoff">${tr('footer.signoffFirst')}<br>${tr('footer.signoffSecond')}</p>
   <p class="personal-credit" lang="en">Built by <a href="https://s.vectorindex.cloud/sean" target="_blank" rel="noopener noreferrer">Sean</a> with ❤️</p>
 </footer>
-${clientScript ? `<script type="module" src="${escape(clientScript)}"></script>` : ''}
+${clientBundle ? `<script type="module">${clientBundle.replace(/<\/script/gi, tag => tag.replace('/', '\\/'))}</script>`
+  : clientScript ? `<script type="module" src="${escape(clientScript)}"></script>` : ''}
 </body></html>`;
 }
 

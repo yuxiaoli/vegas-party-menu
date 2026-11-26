@@ -118,3 +118,18 @@ test('search accepts original text and bilingual labels independently of the sel
   assert.deepEqual(filterMenu([record], { query: t('day.Tuesday') }), []);
   assert.deepEqual(filterMenu([record], { query: t('category.Nightclubs'), day: 'Monday' }), []);
 });
+
+test('Pages can deliver its filter controller in the same response in both locales', () => {
+  const bundle = 'const example = "</ScRiPt><div>";';
+  for (const [locale, siteRoot] of [['en', './'], ['zh-CN', '../']]) {
+    const $ = load(renderSite(menu, { source: 'github_pages_snapshot' }, now, null, null, calendar, {
+      locale, siteRoot, clientBundle: bundle,
+    }));
+    const script = $('script[type="module"]');
+    assert.equal(script.length, 1);
+    assert.equal(script.attr('src'), undefined);
+    assert.equal(script.html(), bundle.replace('/', '\\/'));
+    assert.equal($('button#calendar-date').length, 1);
+    assert.equal($('a[href="' + siteRoot + 'data/calendar.json"]').length, 1);
+  }
+});

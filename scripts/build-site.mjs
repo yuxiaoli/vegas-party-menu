@@ -20,12 +20,19 @@ await mkdir('site-dist/assets', { recursive: true });
 const [djCatalog, venueCatalog] = await Promise.all([loadDJCatalog(siteMenu), loadVenueCatalog(siteMenu)]);
 await writeFile('site-dist/data/dj-matches.json', JSON.stringify(djCatalog, null, 2) + '\n');
 await writeFile('site-dist/data/venue-matches.json', JSON.stringify(venueCatalog, null, 2) + '\n');
+// Keep the markup and its controller in the same response. Cached HTML and
+// JavaScript from different releases cannot leave the filters uninitialized.
+const { outputFiles: [bundle] } = await build({
+  entryPoints: ['src/menu-client.js'], bundle: true, minify: true,
+  format: 'esm', target: ['es2022'], write: false,
+});
+// Older cached pages still load this URL.
+await writeFile('site-dist/assets/menu.js', bundle.contents);
 for (const locale of Object.keys(LOCALES)) {
   const isDefault = locale === DEFAULT_LOCALE;
   const directory = isDefault ? 'site-dist' : `site-dist/${locale}`;
   const siteRoot = isDefault ? './' : '../';
-  const clientScript = isDefault ? './assets/menu.js' : '../assets/menu.js';
-  const html = renderSite(siteMenu, { source: 'github_pages_snapshot', remoteRead: 'ok' }, buildTime, djCatalog, venueCatalog, calendar, { locale, siteRoot, clientScript });
+  const html = renderSite(siteMenu, { source: 'github_pages_snapshot', remoteRead: 'ok' }, buildTime, djCatalog, venueCatalog, calendar, { locale, siteRoot, clientBundle: bundle.text });
   await mkdir(directory, { recursive: true });
   await writeFile(`${directory}/index.html`, html);
 }
@@ -34,7 +41,6 @@ if (calendar) await copyFile('data/calendar.json', 'site-dist/data/calendar.json
 const rss = handleRequest(new Request('https://example.invalid/rss.xml'), menu);
 await writeFile('site-dist/rss.xml', await rss.text());
 await writeFile('site-dist/.nojekyll', '');
-await build({ entryPoints: ['src/menu-client.js'], bundle: true, minify: true, format: 'esm', outfile: 'site-dist/assets/menu.js', target: ['es2022'] });
 console.log(`Built menu-only GitHub Pages site: ${siteMenu.events.length} listings, ${new Set(siteMenu.events.map(event => event.venue)).size} venues. Snapshot ${menu.fetchedAt}.`);
 
 console.log(`DJ catalog: ${djCatalog.status}; ${djCatalog.matchedListingCount} matched listings; edition ${djCatalog.year ?? 'unavailable'}.`);
